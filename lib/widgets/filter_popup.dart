@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../app/app_text_style.dart';
+import '../blocs/filter_cubit.dart';
 import '../gen/assets.gen.dart';
 import 'custom_radio_list.dart';
 
@@ -55,15 +57,15 @@ class _FilterPopupState extends State<FilterPopup> {
               CustomRadioList(
                 title: "A to Z",
                 value: "A to Z",
-                groupValue: nameFilter,
-                onChanged: (value) => setState(() => nameFilter = value!),
+                groupValue: context.watch<FilterCubit>().state.nameFilter,
+                onChanged: (value) => context.read<FilterCubit>().updateNameFilter(value!),
               ),
               const SizedBox(height: 8),
               CustomRadioList(
                 title: "Z to A",
                 value: "Z to A",
-                groupValue: nameFilter,
-                onChanged: (value) => setState(() => nameFilter = value!),
+                groupValue: context.watch<FilterCubit>().state.nameFilter,
+                onChanged: (value) => context.read<FilterCubit>().updateNameFilter(value!),
               ),
               const SizedBox(height: 16),
               Text("Date", style: AppTextStyle.exo20),
@@ -71,15 +73,15 @@ class _FilterPopupState extends State<FilterPopup> {
               CustomRadioList(
                 title: "New files",
                 value: "New files",
-                groupValue: dateFilter,
-                onChanged: (value) => setState(() => dateFilter = value!),
+                groupValue: context.watch<FilterCubit>().state.dateFilter,
+                onChanged: (value) => context.read<FilterCubit>().updateDateFilter(value!),
               ),
               const SizedBox(height: 8),
               CustomRadioList(
                 title: "Old files",
                 value: "Old files",
-                groupValue: dateFilter,
-                onChanged: (value) => setState(() => dateFilter = value!),
+                groupValue: context.watch<FilterCubit>().state.dateFilter,
+                onChanged: (value) => context.read<FilterCubit>().updateDateFilter(value!),
               ),
             ],
           ),

@@ -21,21 +21,21 @@ class _ScanScreenState extends State<ScanScreen> {
   final navigation = NavigationService();
   final List<ScanFile> files = [
     ScanFile(
-      name: 'Scan 070225_card activdsfsdf',
+      name: 'sdf0225_card activdsfsdf',
       id: '',
       created: DateTime.now(),
       size: 1.2,
       path: Assets.images.fileImage.path,
     ),
     ScanFile(
-      name: 'Scan 070225_card activsdfsdfsdfsdf',
+      name: '1230225_card activsdfsdfsdfsdf',
       id: '',
       created: DateTime.now(),
       size: 1.2,
       path: Assets.images.fileImage.path,
     ),
     ScanFile(
-      name: 'Scan 070225_card activsdfsdf',
+      name: 'asijhfdgihasdufctivsdfsdf',
       id: '',
       created: DateTime.now(),
       size: 1.2,

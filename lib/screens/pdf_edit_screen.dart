@@ -16,6 +16,7 @@ class PdfEditScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final navigation = NavigationService();
     return Scaffold(
+      backgroundColor: AppColors.background,
       body: Column(
         children: [
           SizedBox(height: 60),
@@ -23,7 +24,7 @@ class PdfEditScreen extends StatelessWidget {
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 CustomCircularButton(
                   onTap: () {
@@ -35,8 +36,17 @@ class PdfEditScreen extends StatelessWidget {
                     color: AppColors.black,
                   ),
                 ),
-                SizedBox(width: 27),
-                Text('Scanning files', style: AppTextStyle.nunito32),
+                Text('Crop', style: AppTextStyle.nunito32),
+                CustomCircularButton(
+                  onTap: () {
+                    navigation.pop(context);
+                  },
+                  child: Assets.images.share.image(
+                    width: 19,
+                    height: 22,
+                    color: AppColors.black,
+                  ),
+                ),
               ],
             ),
           ),

@@ -3,12 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
+import 'package:owl_tech_pdf_scaner/blocs/files_cubit/files_cubit.dart';
 import 'package:owl_tech_pdf_scaner/blocs/scan_files_cubit/scan_files_cubit.dart';
 import 'package:owl_tech_pdf_scaner/screens/files_page.dart';
 import 'package:owl_tech_pdf_scaner/screens/settings_page.dart';
 import 'package:owl_tech_pdf_scaner/services/navigation_service.dart';
 import 'package:owl_tech_pdf_scaner/widgets/custom_navigation_bar.dart';
 import 'package:path_provider/path_provider.dart';
+
+import 'blocs/filter_cubit.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,6 +32,12 @@ class MyApp extends StatelessWidget {
       providers: [
         BlocProvider(
           create: (context) => ScanFilesCubit(),
+        ),
+        BlocProvider(
+          create: (context) => FilesCubit(),
+        ),
+        BlocProvider(
+          create: (context) => FilterCubit(),
         ),
       ],
       child: MaterialApp(
@@ -60,16 +69,21 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _screens,
-      ),
-      bottomNavigationBar: Padding(
-        padding: EdgeInsets.only(bottom: 48),
-        child: CustomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: (index) => setState(() => _selectedIndex = index),
-        ),
+      body: Stack(
+        alignment: Alignment.center,
+        children: [
+          IndexedStack(
+            index: _selectedIndex,
+            children: _screens,
+          ),
+          Positioned(
+            bottom: 46,
+            child: CustomNavigationBar(
+              currentIndex: _selectedIndex,
+              onTap: (index) => setState(() => _selectedIndex = index),
+            ),
+          )
+        ],
       ),
     );
   }

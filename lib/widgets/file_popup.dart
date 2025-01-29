@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
 import 'package:owl_tech_pdf_scaner/models/scan_file.dart';
 
 import '../app/app_text_style.dart';
+import '../blocs/files_cubit/files_cubit.dart';
 import '../gen/assets.gen.dart';
 
 class FilePopup extends StatelessWidget {
@@ -34,7 +36,10 @@ class FilePopup extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildMenuItem(
-                onTap: () {},
+                onTap: () {
+                  Navigator.pop(context);
+                  context.read<FilesCubit>().removeFile(file.id);
+                },
                 title: 'Delete',
                 icon: Assets.images.delete.image(
                   width: 14,
