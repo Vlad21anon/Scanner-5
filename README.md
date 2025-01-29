@@ -1,16 +1,23 @@
 # owl_tech_pdf_scaner
 
-A new Flutter project.
+// Для генерации рутов, локализации
+flutter pub run build_runner build
 
-## Getting Started
+// Для генерации иконки
+flutter pub run flutter_launcher_icons
 
-This project is a starting point for a Flutter application.
+// для генерации парсера
+flutter pub run easy_localization:generate -S "assets/translations" -O "lib/generated"
 
-A few resources to get you started if this is your first Flutter project:
+// для генерации ключей
+flutter pub run easy_localization:generate -f keys -o locale_keys.g.dart -S "assets/translations" -O "lib/generated"
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+Windows
+keytool -genkey -v -keystore c:\Users\zfann\Downloads\upload-keystore.jks -storetype JKS -keyalg RSA -keysize 2048 -validity 10000 -alias upload
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+macOs
+keytool -genkey -v -keystore ~/upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+
+flutter build apk --release
+
+flutter build aab --release
