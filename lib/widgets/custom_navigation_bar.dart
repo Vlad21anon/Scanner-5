@@ -76,7 +76,7 @@ class CustomNavigationBar extends StatelessWidget {
             onTap: () {
               final navigator = NavigationService();
 
-              navigator.navigateTo(context, CustomScannerScreen());
+              navigator.navigateTo(context, ScanScreen());
             },
             child: Container(
               width: 64,
