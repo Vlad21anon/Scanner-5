@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
+import 'package:owl_tech_pdf_scaner/screens/files_page.dart';
 import 'package:owl_tech_pdf_scaner/screens/scan_screen.dart';
+import 'package:owl_tech_pdf_scaner/screens/settings_screen.dart';
 import 'package:owl_tech_pdf_scaner/services/camera_service.dart';
 import 'package:owl_tech_pdf_scaner/widgets/custom_navigation_bar.dart';
 
@@ -20,15 +23,13 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'PDF Scanner',
       debugShowCheckedModeBanner: false,
-      home: MainScreen(cameras: cameras),
+      home: MainScreen(),
     );
   }
 }
 
 class MainScreen extends StatefulWidget {
-  final List<CameraDescription> cameras;
-
-  const MainScreen({super.key, required this.cameras});
+  const MainScreen({super.key});
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -37,33 +38,24 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
 
-  late List<Widget> _screens = [];
-
-  @override
-  void initState() {
-    _screens = [
-      Scaffold(),
-      ScanScreen(cameraService: CameraService(widget.cameras)),
-      Scaffold(),
-    ];
-    super.initState();
-  }
+  final List<Widget> _screens = [
+    FilesPage(),
+    SettingsScreen(),
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       body: IndexedStack(
         index: _selectedIndex,
         children: _screens,
       ),
-      bottomNavigationBar: Align(
-        alignment: Alignment.bottomCenter,
-        child: Padding(
-          padding: EdgeInsets.only(bottom: 48),
-          child: CustomNavigationBar(
-            currentIndex: _selectedIndex,
-            onTap: (index) => setState(() => _selectedIndex = index),
-          ),
+      bottomNavigationBar: Padding(
+        padding: EdgeInsets.only(bottom: 48),
+        child: CustomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: (index) => setState(() => _selectedIndex = index),
         ),
       ),
     );

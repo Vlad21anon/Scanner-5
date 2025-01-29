@@ -41,6 +41,7 @@ dependencies:
   permission_handler: ^11.3.1
   camera: ^0.11.1
   image_picker: ^1.1.2
+  intl: ^0.18.1
 
 dev_dependencies:
   flutter_test:
@@ -94,6 +95,11 @@ flutter:
         - asset: assets/fonts/Nunito-Regular.ttf
         - asset: assets/fonts/Nunito-Bold.ttf
         - asset: assets/fonts/Nunito-Italic.ttf
+    - family: Exo
+      fonts:
+        - asset: assets/fonts/Exo-Regular.ttf
+        - asset: assets/fonts/Exo-Bold.ttf
+        - asset: assets/fonts/Exo-Italic.ttf
   # fonts:
   #   - family: Schyler
   #     fonts:
