@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
+import 'package:owl_tech_pdf_scaner/screens/scan_screen.dart';
 
 import '../gen/assets.gen.dart';
+import '../services/navigation_service.dart';
 
 class CustomNavigationBar extends StatelessWidget {
   final int currentIndex;
@@ -72,7 +74,9 @@ class CustomNavigationBar extends StatelessWidget {
           bottom: 12,
           child: GestureDetector(
             onTap: () {
+              final navigator = NavigationService();
 
+              navigator.navigateTo(context, CustomScannerScreen());
             },
             child: Container(
               width: 64,

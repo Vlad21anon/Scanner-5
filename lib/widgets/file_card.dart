@@ -5,6 +5,7 @@ import '../app/app_colors.dart';
 import '../app/app_text_style.dart';
 import '../gen/assets.gen.dart';
 import '../models/scan_file.dart';
+import 'file_popup.dart';
 
 class FileCard extends StatelessWidget {
   final ScanFile file;
@@ -77,7 +78,27 @@ class FileCard extends StatelessWidget {
           ),
           SizedBox(width: 26),
           GestureDetector(
-            onTap: () {},
+            onTap: () {
+              final RenderBox button = context.findRenderObject() as RenderBox;
+              final Offset position = button.localToGlobal(Offset.zero);
+
+              showDialog(
+                context: context,
+                barrierColor: Colors.transparent,
+                builder: (context) => Stack(
+                  children: [
+                    Positioned(
+                      right: position.dx,
+                      top: position.dy + position.dx + 16,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: FilePopup(file: file),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
             child: SizedBox(
               height: 54,
               width: 54,
@@ -102,3 +123,5 @@ class FileCard extends StatelessWidget {
     );
   }
 }
+
+

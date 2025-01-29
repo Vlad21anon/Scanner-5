@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
 import 'package:owl_tech_pdf_scaner/app/app_text_style.dart';
 import 'package:owl_tech_pdf_scaner/gen/assets.gen.dart';
 import 'package:owl_tech_pdf_scaner/models/scan_file.dart';
 
 import '../widgets/custom_circular_button.dart';
 import '../widgets/file_card.dart';
+import '../widgets/filter_popup.dart';
 
 class FilesPage extends StatefulWidget {
   const FilesPage({super.key});
@@ -157,125 +157,3 @@ class _FilesPageState extends State<FilesPage> {
     );
   }
 }
-
-class FilterPopup extends StatefulWidget {
-  const FilterPopup({super.key});
-
-  @override
-  State<FilterPopup> createState() => _FilterPopupState();
-}
-
-class _FilterPopupState extends State<FilterPopup> {
-  String nameFilter = "A to Z";
-  String dateFilter = "New files";
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 260,
-      height: 317,
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.3),
-            spreadRadius: 1,
-            blurRadius: 3,
-            offset: Offset(0, 0),
-          )
-        ],
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(
-                  "Filter",
-                  style: AppTextStyle.exo20.copyWith(fontSize: 24),
-                ),
-                const Spacer(),
-                Assets.images.filter.image(width: 24, height: 12),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text("Name", style: AppTextStyle.exo20),
-            const SizedBox(height: 12),
-            CustomRadioList(
-              title: "A to Z",
-              value: "A to Z",
-              groupValue: nameFilter,
-              onChanged: (value) => setState(() => nameFilter = value!),
-            ),
-            const SizedBox(height: 8),
-            CustomRadioList(
-              title: "Z to A",
-              value: "Z to A",
-              groupValue: nameFilter,
-              onChanged: (value) => setState(() => nameFilter = value!),
-            ),
-            const SizedBox(height: 16),
-            Text("Date", style: AppTextStyle.exo20),
-            const SizedBox(height: 12),
-            CustomRadioList(
-              title: "New files",
-              value: "New files",
-              groupValue: dateFilter,
-              onChanged: (value) => setState(() => dateFilter = value!),
-            ),
-            const SizedBox(height: 8),
-            CustomRadioList(
-              title: "Old files",
-              value: "Old files",
-              groupValue: dateFilter,
-              onChanged: (value) => setState(() => dateFilter = value!),
-            ),
-          ],
-        ),
-      )
-    );
-  }
-}
-
-class CustomRadioList extends StatelessWidget {
-  const CustomRadioList({
-    super.key,
-    required this.title,
-    required this.value,
-    required this.groupValue,
-    this.onChanged,
-  });
-
-  final String title;
-  final String value;
-  final String? groupValue;
-  final ValueChanged<String?>? onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final isSelected = value == groupValue;
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onChanged != null ? () => onChanged!(value) : null,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(title, style: AppTextStyle.exo16),
-          SizedBox(
-            width: 32,
-            height: 32,
-            child: isSelected
-                ? Assets.images.circleBorderBold.image(width: 24, height: 24)
-                : Assets.images.circleBorderless.image(width: 24, height: 24),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
