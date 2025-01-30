@@ -84,7 +84,7 @@ class _ScanScreenState extends State<ScanScreen> {
         final files = context.read<ScanFilesCubit>().state;
         navigation.navigateTo(
           context,
-          PdfEditScreen(file: files.first),
+          PdfEditScreen(file: files.last),
         );
       }
     } catch (e) {
@@ -105,6 +105,15 @@ class _ScanScreenState extends State<ScanScreen> {
         // Добавляем файл в cubit
         context.read<ScanFilesCubit>().addFile(filePath);
         context.read<FilesCubit>().addFile(filePath);
+
+        // Если одиночный режим — сразу уходим на экран сканирования
+        if (!isMultiPhoto) {
+          final files = context.read<ScanFilesCubit>().state;
+          navigation.navigateTo(
+            context,
+            PdfEditScreen(file: files.single),
+          );
+        }
       }
     }
   }

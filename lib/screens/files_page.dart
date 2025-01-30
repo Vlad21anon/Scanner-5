@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:owl_tech_pdf_scaner/app/app_text_style.dart';
 import 'package:owl_tech_pdf_scaner/gen/assets.gen.dart';
 import 'package:owl_tech_pdf_scaner/models/scan_file.dart';
+import 'package:owl_tech_pdf_scaner/screens/pdf_edit_screen.dart';
+import 'package:owl_tech_pdf_scaner/services/navigation_service.dart';
 
 import '../blocs/files_cubit/files_cubit.dart';
 import '../blocs/filter_cubit.dart';
@@ -19,6 +21,7 @@ class FilesPage extends StatefulWidget {
 
 class _FilesPageState extends State<FilesPage> {
   bool isSelectedMode = false;
+  final navigation = NavigationService();
 
   @override
   Widget build(BuildContext context) {
@@ -121,7 +124,10 @@ class _FilesPageState extends State<FilesPage> {
                                           .any((file) => file.isSelected);
                                     });
                                   } else {
-                                    // navigateToFile(sortedFiles[index]);
+                                    navigation.navigateTo(
+                                      context,
+                                      PdfEditScreen(file: files[index]),
+                                    );
                                   }
                                 },
                                 onLongPress: () {

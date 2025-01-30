@@ -5,6 +5,7 @@ import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
 import 'package:owl_tech_pdf_scaner/blocs/files_cubit/files_cubit.dart';
 import 'package:owl_tech_pdf_scaner/blocs/scan_files_cubit/scan_files_cubit.dart';
+import 'package:owl_tech_pdf_scaner/blocs/text_edit_cubit.dart';
 import 'package:owl_tech_pdf_scaner/screens/files_page.dart';
 import 'package:owl_tech_pdf_scaner/screens/settings_page.dart';
 import 'package:owl_tech_pdf_scaner/services/navigation_service.dart';
@@ -39,6 +40,9 @@ class MyApp extends StatelessWidget {
         ),
         BlocProvider(
           create: (context) => FilterCubit(),
+        ),
+        BlocProvider(
+          create: (context) => TextEditCubit(),
         ),
       ],
       child: MaterialApp(
