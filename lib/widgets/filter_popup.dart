@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../app/app_shadows.dart';
 import '../app/app_text_style.dart';
 import '../blocs/filter_cubit.dart';
 import '../gen/assets.gen.dart';
@@ -28,12 +29,7 @@ class _FilterPopupState extends State<FilterPopup> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withValues(alpha: 0.3),
-              spreadRadius: 1,
-              blurRadius: 3,
-              offset: Offset(0, 0),
-            )
+            AppShadows.grey03b3r1o00,
           ],
         ),
         child: SingleChildScrollView(

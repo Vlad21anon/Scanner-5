@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
 import 'package:owl_tech_pdf_scaner/screens/scan_screen.dart';
 
+import '../app/app_shadows.dart';
 import '../gen/assets.gen.dart';
 import '../services/navigation_service.dart';
 
@@ -25,12 +26,7 @@ class CustomNavigationBar extends StatelessWidget {
             color: Colors.white,
             borderRadius: BorderRadius.circular(100),
             boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withValues(alpha: 0.3),
-                spreadRadius: 1,
-                blurRadius: 3,
-                offset: const Offset(0, 0),
-              ),
+              AppShadows.grey03b3r1o00,
             ],
           ),
           child: Padding(

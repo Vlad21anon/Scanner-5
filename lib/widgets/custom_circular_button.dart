@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app/app_colors.dart';
+import '../app/app_shadows.dart';
 
 class CustomCircularButton extends StatelessWidget {
   final Color? color;
@@ -20,6 +21,9 @@ class CustomCircularButton extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: color ?? AppColors.white,
+          boxShadow: [
+            AppShadows.grey03b3r1o00,
+          ],
         ),
         child: child,
       ),

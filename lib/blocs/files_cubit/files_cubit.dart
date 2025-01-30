@@ -39,7 +39,7 @@ class FilesCubit extends HydratedCubit<List<ScanFile>> {
       id: uuid,
       name: 'Scan $formattedDate',
       path: path,
-      size: sizeInMb, // уже реальный размер, а не 1.5
+      size: sizeInMb,
       created: DateTime.now(),
     );
 

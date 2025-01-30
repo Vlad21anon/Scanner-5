@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../app/app_colors.dart';
+import '../app/app_shadows.dart';
 import '../app/app_text_style.dart';
 import '../gen/assets.gen.dart';
 import '../models/scan_file.dart';
@@ -40,13 +41,21 @@ class FileCard extends StatelessWidget {
               height: 87,
               child: Stack(
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.file(
-                      File(file.path),
-                      fit: BoxFit.fill,
-                      width: 64,
-                      height: 87,
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        AppShadows.grey03b3r1o00,
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.file(
+                        File(file.path),
+                        fit: BoxFit.fill,
+                        width: 64,
+                        height: 87,
+                      ),
                     ),
                   ),
                   Positioned(

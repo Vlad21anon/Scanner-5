@@ -4,6 +4,7 @@ import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
 import 'package:owl_tech_pdf_scaner/blocs/scan_files_cubit/scan_files_cubit.dart';
 import 'package:owl_tech_pdf_scaner/models/scan_file.dart';
 
+import '../app/app_shadows.dart';
 import '../app/app_text_style.dart';
 import '../blocs/files_cubit/files_cubit.dart';
 import '../gen/assets.gen.dart';
@@ -23,12 +24,7 @@ class FilePopup extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withValues(alpha: 0.3),
-              spreadRadius: 1,
-              blurRadius: 3,
-              offset: Offset(0, 0),
-            )
+            AppShadows.grey03b3r1o00,
           ],
         ),
         child: SingleChildScrollView(
