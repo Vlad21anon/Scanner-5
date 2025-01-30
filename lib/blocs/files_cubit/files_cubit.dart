@@ -1,69 +1,13 @@
-import 'package:hydrated_bloc/hydrated_bloc.dart';
-import 'package:uuid/uuid.dart';
+import 'dart:io';
 
-import '../../gen/assets.gen.dart';
+import 'package:hydrated_bloc/hydrated_bloc.dart';
+import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 import '../../models/scan_file.dart';
 
 class FilesCubit extends HydratedCubit<List<ScanFile>> {
   FilesCubit()
-      : super([
-          ScanFile(
-            name: 'sdfasdf activdsfsdf',
-            id: '3',
-            created: DateTime.now(),
-            size: 1.8,
-            path: Assets.images.fileImage.path,
-          ),
-          ScanFile(
-            name: 'oijoigbdbdtivsdfsdfsdfsdf',
-            id: '2',
-            created: DateTime.now(),
-            size: 1.6,
-            path: Assets.images.fileImage.path,
-          ),
-          ScanFile(
-            name: '32197423d activsdfsdf',
-            id: '1',
-            created: DateTime.now(),
-            size: 2.6,
-            path: Assets.images.fileImage.path,
-          ),
-          ScanFile(
-            name: '12370225_card activdsfsdf',
-            id: '4',
-            created: DateTime.now(),
-            size: 5.8,
-            path: Assets.images.fileImage.path,
-          ),
-          ScanFile(
-            name: 'Scan 070225_card activsdfsdfsdfsdf',
-            id: '5',
-            created: DateTime.now(),
-            size: 4.6,
-            path: Assets.images.fileImage.path,
-          ),
-          ScanFile(
-            name: 'nnbnnnn25_card activsdfsdf',
-            id: '6',
-            created: DateTime.now(),
-            size: 23.6,
-            path: Assets.images.fileImage.path,
-          ),
-          ScanFile(
-            name: 'mmmmmmmmmmmkkkkkkkkvsdfsdf',
-            id: '7',
-            created: DateTime.now(),
-            size: 56.6,
-            path: Assets.images.fileImage.path,
-          ),
-          ScanFile(
-            name: 'eeeeeeeeeeeeeeeeeeevsdfsdf',
-            id: '8',
-            created: DateTime.now(),
-            size: 0.6,
-            path: Assets.images.fileImage.path,
-          ),
-        ]);
+      : super([]);
 
   void toggleSelection(String id) {
     final updatedList = state.map((file) {
@@ -77,14 +21,25 @@ class FilesCubit extends HydratedCubit<List<ScanFile>> {
 
   // Добавление файла в список
   void addFile(String path) {
-    // Генерация имени, id, времени, размера, и т.д. — для примера делаем упрощённо
+    // Создаём File из пути
+    final file = File(path);
+
+    // Получаем размер файла в байтах (int)
+    final bytes = file.lengthSync();
+
+    // Переводим в мегабайты (double)
+    final sizeInMb = bytes / (1024 * 1024);
+
     final uuid = const Uuid().v4();
+
+    // Генерируем дату в нужном формате (ДДММГГ)
+    final String formattedDate = DateFormat('ddMMyy').format(DateTime.now());
+
     final newFile = ScanFile(
       id: uuid,
-      name: 'Scan ${DateTime.now().millisecondsSinceEpoch}',
+      name: 'Scan $formattedDate',
       path: path,
-      size: 1.5,
-      // условно
+      size: sizeInMb, // уже реальный размер, а не 1.5
       created: DateTime.now(),
     );
 

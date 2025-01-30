@@ -46,13 +46,9 @@ class _FilesPageState extends State<FilesPage> {
                               children: [
                                 CustomCircularButton(
                                   onTap: () {
-                                    context.read<FilesCubit>().removeFile(
-                                          files
-                                              .where((file) => file.isSelected)
-                                              .map((file) => file.id)
-                                              .toList()
-                                              .first,
-                                        );
+                                    files.where((file) => file.isSelected).forEach((file) {
+                                      context.read<FilesCubit>().removeFile(file.id);
+                                    });
                                   },
                                   child: Assets.images.delete
                                       .image(width: 24, height: 24),

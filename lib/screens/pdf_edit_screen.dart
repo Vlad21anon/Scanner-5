@@ -8,9 +8,9 @@ import '../services/navigation_service.dart';
 import '../widgets/custom_circular_button.dart';
 
 class PdfEditScreen extends StatelessWidget {
-  final String imagePath;
+  final ScanFile file;
 
-  const PdfEditScreen({super.key, required this.imagePath});
+  const PdfEditScreen({super.key, required this.file});
 
   @override
   Widget build(BuildContext context) {

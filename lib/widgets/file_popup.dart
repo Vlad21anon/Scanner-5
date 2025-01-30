@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
+import 'package:owl_tech_pdf_scaner/blocs/scan_files_cubit/scan_files_cubit.dart';
 import 'package:owl_tech_pdf_scaner/models/scan_file.dart';
 
 import '../app/app_text_style.dart';
@@ -38,6 +39,7 @@ class FilePopup extends StatelessWidget {
               _buildMenuItem(
                 onTap: () {
                   Navigator.pop(context);
+                  context.read<ScanFilesCubit>().removeFile(file.id);
                   context.read<FilesCubit>().removeFile(file.id);
                 },
                 title: 'Delete',

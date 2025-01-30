@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -40,11 +42,16 @@ class FileCard extends StatelessWidget {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Assets.images.fileImage.image(fit: BoxFit.cover),
+                    child: Image.file(
+                      File(file.path),
+                      fit: BoxFit.fill,
+                      width: 64,
+                      height: 87,
+                    ),
                   ),
                   Positioned(
-                    top: 3,
-                    right: 3,
+                    top: 5,
+                    right: 5,
                     child: Container(
                       width: 19,
                       height: 20,
@@ -63,27 +70,26 @@ class FileCard extends StatelessWidget {
             ),
             SizedBox(width: 26),
             Expanded(
-              child: Container(
-                color: Colors.transparent,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      file.name,
-                      style: AppTextStyle.exo20,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    SizedBox(height: 12),
-                    Text(
-                      '${DateFormat('dd MMM yyyy').format(file.created)} ${file.size.toStringAsFixed(1)}MB',
-                      style: AppTextStyle.exo16,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              )
-            ),
+                child: Container(
+              color: Colors.transparent,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    file.name,
+                    style: AppTextStyle.exo20,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    '${DateFormat('dd MMM yyyy').format(file.created)} ${file.size.toStringAsFixed(1)}MB',
+                    style: AppTextStyle.exo16,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            )),
             SizedBox(width: 26),
             GestureDetector(
               onTap: () {
