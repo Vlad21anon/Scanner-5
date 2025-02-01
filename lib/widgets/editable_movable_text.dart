@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:defer_pointer/defer_pointer.dart';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
+
+import 'package:flutter/rendering.dart';
 
 enum HandleType { corner, horizontal, vertical }
 
@@ -37,10 +40,11 @@ class EditableMovableResizableText extends StatefulWidget {
 
   @override
   State<EditableMovableResizableText> createState() =>
-      _EditableMovableResizableTextState();
+      EditableMovableResizableTextState();
 }
 
-class _EditableMovableResizableTextState extends State<EditableMovableResizableText> {
+class EditableMovableResizableTextState
+    extends State<EditableMovableResizableText> {
   // Позиция текста – изначально берётся из родительского параметра,
   // но если ещё не инициализирована, то задаётся по центру доступной области (как в CropWidget).
   late Offset _position;
@@ -75,6 +79,9 @@ class _EditableMovableResizableTextState extends State<EditableMovableResizableT
 
   bool _positionInitialized = false;
 
+  // Ключ для RepaintBoundary, оборачивающего только виджет Text
+  final GlobalKey _textBoundaryKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
@@ -103,6 +110,13 @@ class _EditableMovableResizableTextState extends State<EditableMovableResizableT
         _fontSize = widget.fontSize;
       });
     }
+  }
+
+  /// Функция захвата изображения только текстового виджета
+  Future<ui.Image> captureTextImage({double pixelRatio = 3.0}) async {
+    RenderRepaintBoundary boundary = _textBoundaryKey.currentContext!
+        .findRenderObject() as RenderRepaintBoundary;
+    return await boundary.toImage(pixelRatio: pixelRatio);
   }
 
   @override
@@ -163,30 +177,33 @@ class _EditableMovableResizableTextState extends State<EditableMovableResizableT
                             alignment: Alignment.center,
                             child: _isEditing
                                 ? TextField(
-                              controller: _controller,
-                              focusNode: _focusNode,
-                              style: TextStyle(
-                                fontSize: _fontSize,
-                                color: widget.textColor,
-                              ),
-                              cursorColor: Colors.blue,
-                              decoration: const InputDecoration(
-                                  border: InputBorder.none),
-                              onSubmitted: (newValue) {
-                                setState(() {
-                                  _text = newValue;
-                                  _isEditing = false;
-                                });
-                                widget.onTextChanged(_text);
-                              },
-                            )
-                                : Text(
-                              _text,
-                              style: TextStyle(
-                                fontSize: _fontSize,
-                                color: widget.textColor,
-                              ),
-                            ),
+                                    controller: _controller,
+                                    focusNode: _focusNode,
+                                    style: TextStyle(
+                                      fontSize: _fontSize,
+                                      color: widget.textColor,
+                                    ),
+                                    cursorColor: Colors.blue,
+                                    decoration: const InputDecoration(
+                                        border: InputBorder.none),
+                                    onSubmitted: (newValue) {
+                                      setState(() {
+                                        _text = newValue;
+                                        _isEditing = false;
+                                      });
+                                      widget.onTextChanged(_text);
+                                    },
+                                  )
+                                : RepaintBoundary(
+                                    key: _textBoundaryKey,
+                                    child: Text(
+                                      _text,
+                                      style: TextStyle(
+                                        fontSize: _fontSize,
+                                        color: widget.textColor,
+                                      ),
+                                    ),
+                                  ),
                           ),
                         ),
                         // 8 ручек для изменения размера (аналог ResizableNote)
@@ -199,44 +216,44 @@ class _EditableMovableResizableTextState extends State<EditableMovableResizableT
                         Positioned(
                           top: -hitOffset,
                           left: _width / 2 - hitOffset,
-                          child: _buildHandle(
-                              HandleType.horizontal, _ResizeHandlePosition.topCenter),
+                          child: _buildHandle(HandleType.horizontal,
+                              _ResizeHandlePosition.topCenter),
                         ),
                         Positioned(
                           top: -hitOffset,
                           left: _width - hitOffset,
-                          child: _buildHandle(
-                              HandleType.corner, _ResizeHandlePosition.topRight),
+                          child: _buildHandle(HandleType.corner,
+                              _ResizeHandlePosition.topRight),
                         ),
                         Positioned(
                           top: _height / 2 - hitOffset,
                           left: _width - hitOffset,
-                          child: _buildHandle(
-                              HandleType.vertical, _ResizeHandlePosition.rightCenter),
+                          child: _buildHandle(HandleType.vertical,
+                              _ResizeHandlePosition.rightCenter),
                         ),
                         Positioned(
                           top: _height - hitOffset,
                           left: _width - hitOffset,
-                          child: _buildHandle(
-                              HandleType.corner, _ResizeHandlePosition.bottomRight),
+                          child: _buildHandle(HandleType.corner,
+                              _ResizeHandlePosition.bottomRight),
                         ),
                         Positioned(
                           top: _height - hitOffset,
                           left: _width / 2 - hitOffset,
-                          child: _buildHandle(
-                              HandleType.horizontal, _ResizeHandlePosition.bottomCenter),
+                          child: _buildHandle(HandleType.horizontal,
+                              _ResizeHandlePosition.bottomCenter),
                         ),
                         Positioned(
                           top: _height - hitOffset,
                           left: -hitOffset,
-                          child: _buildHandle(
-                              HandleType.corner, _ResizeHandlePosition.bottomLeft),
+                          child: _buildHandle(HandleType.corner,
+                              _ResizeHandlePosition.bottomLeft),
                         ),
                         Positioned(
                           top: _height / 2 - hitOffset,
                           left: -hitOffset,
-                          child: _buildHandle(
-                              HandleType.vertical, _ResizeHandlePosition.leftCenter),
+                          child: _buildHandle(HandleType.vertical,
+                              _ResizeHandlePosition.leftCenter),
                         ),
                       ],
                     ),
@@ -305,43 +322,63 @@ class _EditableMovableResizableTextState extends State<EditableMovableResizableT
             double scaleFactor = 1.0;
             switch (pos) {
               case _ResizeHandlePosition.topLeft:
-                newWidth = (_initialWidth - dx).clamp(minWidth, double.infinity);
-                newHeight = (_initialHeight - dy).clamp(minHeight, double.infinity);
+                newWidth =
+                    (_initialWidth - dx).clamp(minWidth, double.infinity);
+                newHeight =
+                    (_initialHeight - dy).clamp(minHeight, double.infinity);
                 newPosition = _initialPosition + Offset(dx, dy);
-                scaleFactor = ((newWidth / _initialWidth) + (newHeight / _initialHeight)) / 2;
+                scaleFactor = ((newWidth / _initialWidth) +
+                        (newHeight / _initialHeight)) /
+                    2;
                 break;
               case _ResizeHandlePosition.topCenter:
-                newHeight = (_initialHeight - dy).clamp(minHeight, double.infinity);
+                newHeight =
+                    (_initialHeight - dy).clamp(minHeight, double.infinity);
                 newPosition = _initialPosition + Offset(0, dy);
                 scaleFactor = newHeight / _initialHeight;
                 break;
               case _ResizeHandlePosition.topRight:
-                newWidth = (_initialWidth + dx).clamp(minWidth, double.infinity);
-                newHeight = (_initialHeight - dy).clamp(minHeight, double.infinity);
+                newWidth =
+                    (_initialWidth + dx).clamp(minWidth, double.infinity);
+                newHeight =
+                    (_initialHeight - dy).clamp(minHeight, double.infinity);
                 newPosition = _initialPosition + Offset(0, dy);
-                scaleFactor = ((newWidth / _initialWidth) + (newHeight / _initialHeight)) / 2;
+                scaleFactor = ((newWidth / _initialWidth) +
+                        (newHeight / _initialHeight)) /
+                    2;
                 break;
               case _ResizeHandlePosition.rightCenter:
-                newWidth = (_initialWidth + dx).clamp(minWidth, double.infinity);
+                newWidth =
+                    (_initialWidth + dx).clamp(minWidth, double.infinity);
                 scaleFactor = newWidth / _initialWidth;
                 break;
               case _ResizeHandlePosition.bottomRight:
-                newWidth = (_initialWidth + dx).clamp(minWidth, double.infinity);
-                newHeight = (_initialHeight + dy).clamp(minHeight, double.infinity);
-                scaleFactor = ((newWidth / _initialWidth) + (newHeight / _initialHeight)) / 2;
+                newWidth =
+                    (_initialWidth + dx).clamp(minWidth, double.infinity);
+                newHeight =
+                    (_initialHeight + dy).clamp(minHeight, double.infinity);
+                scaleFactor = ((newWidth / _initialWidth) +
+                        (newHeight / _initialHeight)) /
+                    2;
                 break;
               case _ResizeHandlePosition.bottomCenter:
-                newHeight = (_initialHeight + dy).clamp(minHeight, double.infinity);
+                newHeight =
+                    (_initialHeight + dy).clamp(minHeight, double.infinity);
                 scaleFactor = newHeight / _initialHeight;
                 break;
               case _ResizeHandlePosition.bottomLeft:
-                newWidth = (_initialWidth - dx).clamp(minWidth, double.infinity);
-                newHeight = (_initialHeight + dy).clamp(minHeight, double.infinity);
+                newWidth =
+                    (_initialWidth - dx).clamp(minWidth, double.infinity);
+                newHeight =
+                    (_initialHeight + dy).clamp(minHeight, double.infinity);
                 newPosition = _initialPosition + Offset(dx, 0);
-                scaleFactor = ((newWidth / _initialWidth) + (newHeight / _initialHeight)) / 2;
+                scaleFactor = ((newWidth / _initialWidth) +
+                        (newHeight / _initialHeight)) /
+                    2;
                 break;
               case _ResizeHandlePosition.leftCenter:
-                newWidth = (_initialWidth - dx).clamp(minWidth, double.infinity);
+                newWidth =
+                    (_initialWidth - dx).clamp(minWidth, double.infinity);
                 newPosition = _initialPosition + Offset(dx, 0);
                 scaleFactor = newWidth / _initialWidth;
                 break;

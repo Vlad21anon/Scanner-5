@@ -1,12 +1,13 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
 import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
 import 'package:owl_tech_pdf_scaner/app/app_text_style.dart';
 import 'package:owl_tech_pdf_scaner/widgets/%D1%81ustom_slider.dart';
-
-import '../models/scan_file.dart';
 import 'editable_movable_text.dart';
+import '../models/scan_file.dart';
+import 'dart:typed_data';
 
 /// Виджет редактирования текста поверх изображения
 class TextEditWidget extends StatefulWidget {
@@ -15,10 +16,10 @@ class TextEditWidget extends StatefulWidget {
   const TextEditWidget({super.key, required this.file});
 
   @override
-  State<TextEditWidget> createState() => TextEditWidgetState ();
+  State<TextEditWidget> createState() => TextEditWidgetState();
 }
 
-class TextEditWidgetState  extends State<TextEditWidget> {
+class TextEditWidgetState extends State<TextEditWidget> {
   /// Текущее содержимое текста (при желании связываем с EditableMovableText)
   String _text = 'Tap to edit';
 
@@ -32,6 +33,9 @@ class TextEditWidgetState  extends State<TextEditWidget> {
   Offset _textOffset = const Offset(100, 100);
 
   bool isEditMode = false;
+
+  // Создаём GlobalKey для доступа к состоянию EditableMovableResizableText
+  final GlobalKey<EditableMovableResizableTextState> textEditKey = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
@@ -73,7 +77,8 @@ class TextEditWidgetState  extends State<TextEditWidget> {
                 return Container(
                   decoration: const BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(30)),
                   ),
                   child: ListView(
                     controller: scrollController,
@@ -205,39 +210,100 @@ class TextEditWidgetState  extends State<TextEditWidget> {
     );
   }
 
-  /// Функция сохранения текста в изображение
+  /// Функция сохранения текста в изображении.
+  /// При сохранении учитываются положение, цвет и размер текста.
+  /// Функция сохранения изображения, полученного из виджета Text
   Future<void> saveTextInImage() async {
+    final path = widget.file.path;
+    if (path.isEmpty) {
+      debugPrint('Файл не задан или путь пуст');
+      return;
+    }
+    final file = File(path);
+    if (!await file.exists()) {
+      debugPrint('Файл не найден: $path');
+      return;
+    }
     try {
-      final originalFile = File(widget.file.path);
-      final bytes = await originalFile.readAsBytes();
-      final decoded = img.decodeImage(bytes);
-      if (decoded == null) {
-        throw Exception('Не удалось декодировать изображение');
-      }
-      // Преобразуем координаты в пиксели (упрощённо)
-      final int xPos = _textOffset.dx.toInt();
-      final int yPos = _textOffset.dy.toInt();
-      img.drawString(
-        decoded,
-        _text,
-        x: xPos,
-        y: yPos,
-        font: img.arial14,
+      debugPrint("Начало сохранения изображения с текстом");
+
+      // 1. Чтение исходного файла и декодирование изображения.
+      final fileBytes = await file.readAsBytes();
+      final ui.Codec codec = await ui.instantiateImageCodec(fileBytes);
+      final ui.FrameInfo frameInfo = await codec.getNextFrame();
+      final ui.Image originalImage = frameInfo.image;
+      final int originalWidth = originalImage.width;
+      final int originalHeight = originalImage.height;
+      debugPrint("Исходное изображение: ${originalWidth}x${originalHeight}");
+
+      // 2. Задаём размеры отображаемого изображения в UI.
+      const double displayedWidth = 361;
+      const double displayedHeight = 491;
+      final double scaleX = originalWidth / displayedWidth;
+      final double scaleY = originalHeight / displayedHeight;
+      debugPrint("Масштабирование: scaleX = $scaleX, scaleY = $scaleY");
+
+      // 3. Создаём PictureRecorder и Canvas.
+      final ui.PictureRecorder recorder = ui.PictureRecorder();
+      final Canvas canvas = Canvas(recorder);
+
+      // Рисуем исходное изображение.
+      canvas.drawImage(originalImage, Offset.zero, Paint());
+
+      // 4. Рисуем текст.
+      // Масштабируем позицию текста: _textOffset – координаты на экране (displayed),
+      // переводим их в координаты исходного изображения.
+      final double drawX = _textOffset.dx * scaleX;
+      final double drawY = _textOffset.dy * scaleY;
+      debugPrint("Позиция текста на изображении: x = $drawX, y = $drawY");
+
+      // Создаём стиль параграфа.
+      final ui.ParagraphStyle paragraphStyle = ui.ParagraphStyle(
+        textAlign: TextAlign.left,
+        // можно задать maxLines, ellipsis и т.д.
       );
-      final newBytes = img.encodePng(decoded);
-      await originalFile.writeAsBytes(newBytes);
+      // Масштабируем размер шрифта также (например, по scaleX)
+      final ui.TextStyle textStyle = ui.TextStyle(
+        color: _textColor,
+        fontSize: _fontSize * scaleX, // масштабирование размера шрифта
+      );
+      final ui.ParagraphBuilder paragraphBuilder = ui.ParagraphBuilder(paragraphStyle)
+        ..pushStyle(textStyle)
+        ..addText(_text);
+      // Задаём ограничение по ширине – здесь можно использовать максимальную ширину текста на изображении.
+      final ui.Paragraph paragraph = paragraphBuilder.build();
+      paragraph.layout(ui.ParagraphConstraints(width: displayedWidth * scaleX));
+      debugPrint("Параграф сформирован, ширина: ${displayedWidth * scaleX}");
+
+      // Рисуем текст на канве.
+      canvas.drawParagraph(paragraph, Offset(drawX, drawY));
+      debugPrint("Текст отрисован на канве");
+
+      // 5. Получаем итоговое изображение.
+      final ui.Picture picture = recorder.endRecording();
+      final ui.Image finalImage = await picture.toImage(originalWidth, originalHeight);
+      final ByteData? finalByteData =
+      await finalImage.toByteData(format: ui.ImageByteFormat.png);
+      if (finalByteData == null) {
+        debugPrint('Не удалось получить данные итогового изображения');
+        return;
+      }
+      final Uint8List finalBytes = finalByteData.buffer.asUint8List();
+
+      // 6. Перезаписываем файл.
+      await file.writeAsBytes(finalBytes);
+      debugPrint('Изображение с текстом сохранено в тот же файл: $path');
+
+      // Очистка кэша изображений.
       imageCache.clear();
       imageCache.clearLiveImages();
-      final fileImage = FileImage(File(widget.file.path));
+      final FileImage fileImage = FileImage(file);
       await fileImage.evict();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Изображение перезаписано успешно')),
-      );
     } catch (e) {
-      debugPrint('Ошибка при сохранении текста: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка при сохранении: $e')),
-      );
+      debugPrint('Ошибка при сохранении изображения с текстом: $e');
     }
   }
+
+
+
 }

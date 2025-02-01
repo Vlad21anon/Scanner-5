@@ -110,7 +110,7 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
     }
     // При переходе из режима Pen сохраняем аннотации.
     if (_oldIndex == 2 && newIndex != 2) {
-      //await _penKey.currentState?.saveAnnotatedImage();
+      await _penKey.currentState?.saveAnnotatedImage();
     }
 
     // Если переключаемся в режим Pen, учитываем лимит использования.
