@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
 
 class GradientSlider extends StatefulWidget {
   final double value;
   final ValueChanged<double> onChanged;
+  final bool isActive;
 
-  const GradientSlider({super.key, required this.value, required this.onChanged});
+  const GradientSlider({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    this.isActive = false,
+  });
 
   @override
   State<GradientSlider> createState() => _GradientSliderState();
@@ -16,8 +23,8 @@ class _GradientSliderState extends State<GradientSlider> {
     return SliderTheme(
       data: SliderTheme.of(context).copyWith(
         trackHeight: 13.0,
-        thumbShape: const _CustomThumbShape(),
-        trackShape: const _GradientTrackShape(),
+        thumbShape: _CustomThumbShape(widget.isActive),
+        trackShape: _GradientTrackShape(widget.isActive),
         overlayShape: const RoundSliderOverlayShape(overlayRadius: 20.0),
       ),
       child: Slider(
@@ -31,29 +38,30 @@ class _GradientSliderState extends State<GradientSlider> {
 }
 
 class _CustomThumbShape extends RoundSliderThumbShape {
-  const _CustomThumbShape();
+  final bool isActive;
+  const _CustomThumbShape(this.isActive);
 
   @override
   void paint(
-      PaintingContext context,
-      Offset center, {
-        required Animation<double> activationAnimation,
-        required Animation<double> enableAnimation,
-        required bool isDiscrete,
-        required TextPainter labelPainter,
-        required RenderBox parentBox,
-        required SliderThemeData sliderTheme,
-        required TextDirection textDirection,
-        required double value,
-        required double textScaleFactor,
-        required Size sizeWithOverflow,
-      }) {
+    PaintingContext context,
+    Offset center, {
+    required Animation<double> activationAnimation,
+    required Animation<double> enableAnimation,
+    required bool isDiscrete,
+    required TextPainter labelPainter,
+    required RenderBox parentBox,
+    required SliderThemeData sliderTheme,
+    required TextDirection textDirection,
+    required double value,
+    required double textScaleFactor,
+    required Size sizeWithOverflow,
+  }) {
     final Paint fillPaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.fill;
 
     final Paint borderPaint = Paint()
-      ..color = Colors.black
+      ..color = isActive ? AppColors.blue : Colors.black
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
 
@@ -63,22 +71,23 @@ class _CustomThumbShape extends RoundSliderThumbShape {
 }
 
 class _GradientTrackShape extends RoundedRectSliderTrackShape {
-  const _GradientTrackShape();
+  final bool isActive;
+  const _GradientTrackShape(this.isActive);
 
   @override
   void paint(
-      PaintingContext context,
-      Offset offset, {
-        required RenderBox parentBox,
-        required SliderThemeData sliderTheme,
-        required Animation<double> enableAnimation,
-        required TextDirection textDirection,
-        required Offset thumbCenter,
-        Offset? secondaryOffset, // Новый параметр
-        bool isDiscrete = false,
-        bool isEnabled = false,
-        double additionalActiveTrackHeight = 2,
-      }) {
+    PaintingContext context,
+    Offset offset, {
+    required RenderBox parentBox,
+    required SliderThemeData sliderTheme,
+    required Animation<double> enableAnimation,
+    required TextDirection textDirection,
+    required Offset thumbCenter,
+    Offset? secondaryOffset, // Новый параметр
+    bool isDiscrete = false,
+    bool isEnabled = false,
+    double additionalActiveTrackHeight = 2,
+  }) {
     final Rect trackRect = getPreferredRect(
       parentBox: parentBox,
       offset: offset,
@@ -89,7 +98,7 @@ class _GradientTrackShape extends RoundedRectSliderTrackShape {
 
     final Paint activePaint = Paint()
       ..shader = LinearGradient(
-        colors: [Color(0xFF676872), Color(0xFF19191E)],
+        colors: isActive ? [Color(0xFF58B4FF), AppColors.blue] : [Color(0xFF676872), Color(0xFF19191E)],
         begin: Alignment.centerLeft,
         end: Alignment.centerRight,
       ).createShader(Rect.fromLTRB(
@@ -99,8 +108,7 @@ class _GradientTrackShape extends RoundedRectSliderTrackShape {
         trackRect.bottom,
       ));
 
-    final Paint inactivePaint = Paint()
-      ..color = Color(0xFFCECFD6);
+    final Paint inactivePaint = Paint()..color = Color(0xFFCECFD6);
 
     final Radius trackRadius = Radius.circular(trackRect.height / 2);
 

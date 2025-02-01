@@ -1,8 +1,12 @@
 import 'dart:io'; // Для File
 import 'dart:math' as math; // Для min/max
+import 'package:defer_pointer/defer_pointer.dart';
 import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img; // Для обрезки и кодирования
 import 'package:owl_tech_pdf_scaner/models/scan_file.dart';
+import 'package:owl_tech_pdf_scaner/widgets/resizable_note.dart';
+
+import '../app/app_colors.dart';
 
 ///
 /// Виджет обрезки фото: пользователь двигает «углы»,
@@ -22,11 +26,20 @@ class CropWidgetState extends State<CropWidget> {
   int _imageWidth = 0;
   int _imageHeight = 0;
 
+  // Флаг инициализации ручек.
+  bool _initializedHandles = false;
+
   // 4 угла обрезаемой области (в координатах виджета)
-  Offset _topLeft = const Offset(50, 50);
+  Offset _topLeft = const Offset(0, 0);
   Offset _topRight = const Offset(250, 50);
   Offset _bottomLeft = const Offset(50, 350);
   Offset _bottomRight = const Offset(250, 350);
+
+  /// Константы для размеров ручек и области нажатия.
+  static const double cornerSize = 13.0;
+  static const Size horizontalSize = Size(39.0, 6.0);
+  static const Size verticalSize = Size(6.0, 39.0);
+  static const double hitSize = 44.0; // Минимальная область нажатия
 
   // Какую ручку сейчас тащим
   _HandlePosition? _draggingHandle;
@@ -193,6 +206,27 @@ class CropWidgetState extends State<CropWidget> {
     return Rect.fromLTRB(left, top, right, bottom);
   }
 
+  /// Вычисляем прямоугольник, в котором отрисовывается изображение с BoxFit.contain.
+  Rect _getImageRect(Size containerSize) {
+    if (_imageWidth == 0 || _imageHeight == 0) return Rect.zero;
+    final containerAspect = containerSize.width / containerSize.height;
+    final imageAspect = _imageWidth / _imageHeight;
+    double scale;
+    double offsetX = 0;
+    double offsetY = 0;
+    if (imageAspect > containerAspect) {
+      scale = containerSize.width / _imageWidth;
+      final realHeight = _imageHeight * scale;
+      offsetY = (containerSize.height - realHeight) / 2;
+      return Rect.fromLTWH(0, offsetY, containerSize.width, realHeight);
+    } else {
+      scale = containerSize.height / _imageHeight;
+      final realWidth = _imageWidth * scale;
+      offsetX = (containerSize.width - realWidth) / 2;
+      return Rect.fromLTWH(offsetX, 0, realWidth, containerSize.height);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final imagePath = widget.file.path;
@@ -200,95 +234,71 @@ class CropWidgetState extends State<CropWidget> {
       return const Center(child: Text('Нет пути к изображению'));
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Padding(
-          padding: const EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 24,
-            bottom: 210,
-          ),
-          child: LayoutBuilder(
-            builder: (ctx, innerConstraints) {
-              // Размер «рабочей» области (после Padding)
-              _containerSize = Size(
-                innerConstraints.maxWidth,
-                innerConstraints.maxHeight,
-              );
+    return DeferredPointerHandler(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return Padding(
+            padding: const EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 24,
+              bottom: 210,
+            ),
+            child: LayoutBuilder(
+              builder: (ctx, innerConstraints) {
+                // Размер «рабочей» области (после Padding)
+                _containerSize = Size(
+                  innerConstraints.maxWidth,
+                  innerConstraints.maxHeight,
+                );
 
-              return Stack(
-                children: [
-                  // 1) Само изображение
-                  Positioned.fill(
-                    child: Image.file(
-                      File(imagePath),
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                  // 2) Рисуем затемнение + рамку
-                  Positioned.fill(
-                    child: CustomPaint(
-                      painter: _CropPainter(
-                        topLeft: _topLeft,
-                        topRight: _topRight,
-                        bottomLeft: _bottomLeft,
-                        bottomRight: _bottomRight,
+                // Если ручки ещё не инициализированы и размеры изображения уже загружены,
+                // вычисляем прямоугольник, в котором отрисовано изображение, и устанавливаем углы.
+                if (!_initializedHandles && _imageWidth != 0 && _imageHeight != 0) {
+                  final imageRect = _getImageRect(_containerSize);
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    setState(() {
+                      _topLeft = imageRect.topLeft;
+                      _topRight = imageRect.topRight;
+                      _bottomLeft = imageRect.bottomLeft;
+                      _bottomRight = imageRect.bottomRight;
+                      _initializedHandles = true;
+                    });
+                  });
+                }
+
+                return Stack(
+                  children: [
+                    // 1) Само изображение
+                    Positioned.fill(
+                      child: Image.file(
+                        File(imagePath),
+                        fit: BoxFit.contain,
                       ),
                     ),
-                  ),
-                  // 3) Генерируем 8 ручек (4 угла + 4 стороны)
-                  ..._buildAllHandles(),
-                  // Можно добавить кнопки, кнопки «Сохранить» и т.д.
-                ],
-              );
-            },
-          ),
-        );
-      },
+                    // 2) Рисуем затемнение + рамку
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: _CropPainter(
+                          topLeft: _topLeft,
+                          topRight: _topRight,
+                          bottomLeft: _bottomLeft,
+                          bottomRight: _bottomRight,
+                        ),
+                      ),
+                    ),
+                    // 3) Генерируем 8 ручек (4 угла + 4 стороны)
+                    ..._buildAllHandles(),
+                    // Можно добавить кнопки, кнопки «Сохранить» и т.д.
+                  ],
+                );
+              },
+            ),
+          );
+        },
+      ),
     );
   }
-
-  //
-  // Widget _buildCornerHandle(String cornerKey, Offset cornerOffset) {
-  //   const handleSize = 24.0;
-  //
-  //   return Positioned(
-  //     left: cornerOffset.dx - handleSize / 2,
-  //     top: cornerOffset.dy - handleSize / 2,
-  //     child: GestureDetector(
-  //       onPanStart: (_) => setState(() => _draggingCornerKey = cornerKey),
-  //       onPanUpdate: (details) {
-  //         setState(() {
-  //           switch (_draggingCornerKey) {
-  //             case 'topLeft':
-  //               _topLeft += details.delta;
-  //               break;
-  //             case 'topRight':
-  //               _topRight += details.delta;
-  //               break;
-  //             case 'bottomLeft':
-  //               _bottomLeft += details.delta;
-  //               break;
-  //             case 'bottomRight':
-  //               _bottomRight += details.delta;
-  //               break;
-  //           }
-  //         });
-  //       },
-  //       onPanEnd: (_) => setState(() => _draggingCornerKey = null),
-  //       child: Container(
-  //         width: handleSize,
-  //         height: handleSize,
-  //         decoration: BoxDecoration(
-  //           color: Colors.blueAccent.withOpacity(0.8),
-  //           shape: BoxShape.circle,
-  //           border: Border.all(color: Colors.white, width: 2),
-  //         ),
-  //       ),
-  //     ),
-  //   );
-  // }
 
   /// Создаём все 8 ручек.
   List<Widget> _buildAllHandles() {
@@ -304,47 +314,107 @@ class CropWidgetState extends State<CropWidget> {
     ];
   }
 
-  /// Создаём конкретную ручку (GestureDetector + Positioned).
+  /// Создаём конкретную ручку с новым дизайном, привязанную к границам изображения.
   Widget _buildHandle(_HandlePosition pos) {
-    const handleSize = 20.0;
+    // Определяем тип ручки в зависимости от позиции
+    late HandleType type;
+    if (pos == _HandlePosition.topLeft ||
+        pos == _HandlePosition.topRight ||
+        pos == _HandlePosition.bottomLeft ||
+        pos == _HandlePosition.bottomRight) {
+      type = HandleType.corner;
+    } else if (pos == _HandlePosition.topCenter ||
+        pos == _HandlePosition.bottomCenter) {
+      type = HandleType.horizontal;
+    } else {
+      type = HandleType.vertical;
+    }
 
-    // Вычисляем, где её рисовать (центр кружка).
+    // Вычисляем положение центра ручки
     final offset = _getHandleOffset(pos);
 
+    // Определяем визуальный размер ручки в зависимости от типа
+    late Size visualSize;
+    switch (type) {
+      case HandleType.corner:
+        visualSize = const Size(cornerSize, cornerSize);
+        break;
+      case HandleType.horizontal:
+        visualSize = horizontalSize;
+        break;
+      case HandleType.vertical:
+        visualSize = verticalSize;
+        break;
+    }
+    // Вычисляем размер области нажатия
+    final double hitW = math.max(visualSize.width, hitSize);
+    final double hitH = math.max(visualSize.height, hitSize);
+
     return Positioned(
-      left: offset.dx - handleSize / 2,
-      top: offset.dy - handleSize / 2,
-      width: handleSize,
-      height: handleSize,
-      child: GestureDetector(
-        onPanStart: (details) {
-          setState(() {
-            _draggingHandle = pos;
-            _initialDragOffset = details.globalPosition;
-            // Запоминаем исходные координаты углов
-            _initialTopLeft = _topLeft;
-            _initialTopRight = _topRight;
-            _initialBottomLeft = _bottomLeft;
-            _initialBottomRight = _bottomRight;
-          });
-        },
-        onPanUpdate: (details) {
-          setState(() {
-            final dx = details.globalPosition.dx - _initialDragOffset.dx;
-            final dy = details.globalPosition.dy - _initialDragOffset.dy;
-            _updateOffsets(pos, dx, dy);
-          });
-        },
-        onPanEnd: (details) {
-          setState(() {
-            _draggingHandle = null;
-          });
-        },
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.blueAccent,
-            shape: BoxShape.circle,
-            border: Border.all(width: 2, color: Colors.white),
+      left: offset.dx - hitW / 2,
+      top: offset.dy - hitH / 2,
+      width: hitW,
+      height: hitH,
+      child: DeferPointer(
+        link: null,
+        // Здесь можно задать ссылку для отложенного распознавания указателей
+        paintOnTop: true,
+        child: GestureDetector(
+          onPanStart: (details) {
+            setState(() {
+              _draggingHandle = pos;
+              _initialDragOffset = details.globalPosition;
+              // Запоминаем исходные координаты углов
+              _initialTopLeft = _topLeft;
+              _initialTopRight = _topRight;
+              _initialBottomLeft = _bottomLeft;
+              _initialBottomRight = _bottomRight;
+            });
+          },
+          onPanUpdate: (details) {
+            setState(() {
+              final dx = details.globalPosition.dx - _initialDragOffset.dx;
+              final dy = details.globalPosition.dy - _initialDragOffset.dy;
+              _updateOffsets(pos, dx, dy);
+            });
+          },
+          onPanEnd: (details) {
+            setState(() {
+              _draggingHandle = null;
+            });
+          },
+          child: Container(
+            width: hitW,
+            height: hitH,
+            alignment: Alignment.center,
+            color: Colors.transparent,
+            child: Container(
+              width: visualSize.width,
+              height: visualSize.height,
+              decoration: () {
+                // Оформление ручки в зависимости от типа
+                switch (type) {
+                  case HandleType.corner:
+                    return BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: AppColors.blueLight),
+                      shape: BoxShape.circle,
+                    );
+                  case HandleType.horizontal:
+                    return BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: AppColors.blueLight),
+                      borderRadius: BorderRadius.circular(11),
+                    );
+                  case HandleType.vertical:
+                    return BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: AppColors.blueLight),
+                      borderRadius: BorderRadius.circular(11),
+                    );
+                }
+              }(),
+            ),
           ),
         ),
       ),
@@ -434,8 +504,10 @@ class CropWidgetState extends State<CropWidget> {
 
     // Здесь можно вставить проверки, чтобы не уходить за границы.
     // Например:
-    // tl = _clampToArea(tl);
-    // tr = _clampToArea(tr);
+    tl = _clampToArea(tl);
+    bl = _clampToArea(bl);
+    br = _clampToArea(br);
+    tr = _clampToArea(tr);
     // ... итд
 
     _topLeft = tl;
@@ -472,25 +544,27 @@ class _CropPainter extends CustomPainter {
   final Offset topRight;
   final Offset bottomLeft;
   final Offset bottomRight;
+  final bool withShadow;
 
   _CropPainter({
     required this.topLeft,
     required this.topRight,
     required this.bottomLeft,
     required this.bottomRight,
+    this.withShadow = false,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     final paintOverlay = Paint()..color = Colors.black54;
     final paintBorder = Paint()
-      ..color = Colors.white
+      ..color = AppColors.blueLight
       ..strokeWidth = 2
       ..style = PaintingStyle.stroke;
 
     final fullRect = Rect.fromLTWH(0, 0, size.width, size.height);
     // затемнение
-    canvas.drawRect(fullRect, paintOverlay);
+    withShadow ? canvas.drawRect(fullRect, paintOverlay) : null;
 
     final cropPath = Path()
       ..moveTo(topLeft.dx, topLeft.dy)

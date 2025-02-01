@@ -7,9 +7,17 @@ class CustomCircularButton extends StatelessWidget {
   final Color? color;
   final Widget? child;
   final VoidCallback onTap;
+  final bool withShadow;
+  final bool withBorder;
 
-  const CustomCircularButton(
-      {super.key, this.color, this.child, required this.onTap});
+  const CustomCircularButton({
+    super.key,
+    this.color,
+    this.child,
+    required this.onTap,
+    this.withShadow = true,
+    this.withBorder = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -22,8 +30,11 @@ class CustomCircularButton extends StatelessWidget {
           shape: BoxShape.circle,
           color: color ?? AppColors.white,
           boxShadow: [
-            AppShadows.grey03b3r1o00,
+            if (withShadow) AppShadows.grey03b3r1o00,
           ],
+          border: withBorder
+              ? Border.all(width: 2, color: AppColors.greyIcon)
+              : null,
         ),
         child: child,
       ),

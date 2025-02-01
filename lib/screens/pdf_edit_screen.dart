@@ -1,14 +1,14 @@
+// PdfEditScreen.dart
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:owl_tech_pdf_scaner/models/scan_file.dart';
-
 import '../app/app_colors.dart';
 import '../app/app_text_style.dart';
 import '../gen/assets.gen.dart';
 import '../services/navigation_service.dart';
 import '../widgets/crop_widget.dart';
 import '../widgets/custom_circular_button.dart';
+import '../widgets/pen_edit_widget.dart';
 import '../widgets/text_edit_widget.dart';
 import '../widgets/toggle_menu.dart';
 
@@ -24,9 +24,12 @@ class PdfEditScreen extends StatefulWidget {
 class _PdfEditScreenState extends State<PdfEditScreen> {
   int _selectedIndex = 0;
   int _oldIndex = 0;
+  int _penModeCount = 0; // Счётчик использования режима Pen
 
-  // Ключ, чтобы обращаться к состоянию CropWidget и вызывать сохранение
+  // Глобальные ключи для вызова функций сохранения в каждом режиме
   final GlobalKey<CropWidgetState> _cropKey = GlobalKey<CropWidgetState>();
+  final GlobalKey<TextEditWidgetState> _textKey = GlobalKey<TextEditWidgetState>();
+  final GlobalKey<PenEditWidgetState> _penKey = GlobalKey<PenEditWidgetState>();
 
   late List<Widget> _pages = [];
 
@@ -39,29 +42,89 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
         file: widget.file,
       ),
 
-      // 1. Режим текста — передаём ScanFile
-      TextEditWidget(file: widget.file),
+      // 1. Режим текста
+      TextEditWidget(
+        key: _textKey,
+        file: widget.file,
+      ),
 
       // 2. Режим pen
-      const Center(child: Text('Pen page')),
+      PenEditWidget(
+        key: _penKey,
+        file: widget.file,
+      ),
     ];
     super.initState();
   }
 
+  Future<bool?> _showSubscriptionDialog() async {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Ограничение доступа"),
+          content: const Text(
+              "Для продолжения использования режима Pen подпишитесь или поделитесь файлом в формате PDF."),
+          actions: [
+            TextButton(
+              onPressed: () {
+                // Здесь можно добавить логику подписки.
+                Navigator.of(context).pop(true);
+              },
+              child: const Text("Подписаться"),
+            ),
+            TextButton(
+              onPressed: () async {
+                await _sharePdfFile();
+                Navigator.of(context).pop(true);
+              },
+              child: const Text("Поделиться"),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(false);
+              },
+              child: const Text("Отмена"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Stub‑вариант функции для преобразования и шаринга файла в PDF.
+  Future<void> _sharePdfFile() async {
+    // Здесь реализуйте преобразование аннотированного изображения в PDF
+    // и вызов плагина, например, share_plus.
+    debugPrint("Реализуйте логику шаринга PDF-файла");
+  }
+
   void _onIndexChanged(int newIndex) async {
-    /// Если выходим из режима Crop (был 0, стало не 0), то делаем обрезку
+    // При переходе из режима Crop сохраняем изменения.
     if (_oldIndex == 0 && newIndex != 0) {
-      await _cropKey.currentState?.saveCrop(); // вызываем метод сохранения
+      await _cropKey.currentState?.saveCrop();
+    }
+    // При переходе из режима текста сохраняем текст.
+    if (_oldIndex == 1 && newIndex != 1) {
+      await _textKey.currentState?.saveTextInImage();
+    }
+    // При переходе из режима Pen сохраняем аннотации.
+    if (_oldIndex == 2 && newIndex != 2) {
+      //await _penKey.currentState?.saveAnnotatedImage();
     }
 
-    // Если уходим с режима текста (1) на что-то другое,
-    // то "сохраняем" или фиксируем изменения текста
-    if (_oldIndex == 1 && newIndex != 1) {
-      // При необходимости можно вызвать тут метод cubit'а,
-      // но обычно состояние уже хранится. Для примера:
-      // context.read<TextEditCubit>().saveTextChanges();
+    // Если переключаемся в режим Pen, учитываем лимит использования.
+    if (newIndex == 2) {
+      _penModeCount++;
+      if (_penModeCount > 2) {
+        bool? allowed = await _showSubscriptionDialog();
+        if (allowed != true) {
+          // Если пользователь отменяет, остаёмся в предыдущем режиме.
+          return;
+        }
+      }
     }
-    // Обновляем состояние
+
     setState(() {
       _selectedIndex = newIndex;
       _oldIndex = newIndex;
@@ -73,15 +136,16 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
     final navigation = NavigationService();
     return Scaffold(
       backgroundColor: AppColors.background,
+      resizeToAvoidBottomInset: false,
       body: Stack(
         alignment: Alignment.center,
         children: [
           Column(
             children: [
-              SizedBox(height: 60),
-              SizedBox(height: 16),
+              const SizedBox(height: 60),
+              const SizedBox(height: 16),
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -118,7 +182,7 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
             ],
           ),
           Positioned(
-            bottom: 46,
+            bottom: 12,
             child: ToggleMenu(
               onIndexChanged: _onIndexChanged,
             ),

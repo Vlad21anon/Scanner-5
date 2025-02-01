@@ -259,6 +259,7 @@ class _ScanScreenState extends State<ScanScreen> {
             top: 75,
             left: 16,
             child: CustomCircularButton(
+              withShadow: false,
               color: AppColors.black.withValues(alpha: 0.6),
               onTap: () {
                 navigation.pop(context);

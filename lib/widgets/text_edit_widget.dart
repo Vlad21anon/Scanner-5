@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
 import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
@@ -13,15 +12,15 @@ import 'editable_movable_text.dart';
 class TextEditWidget extends StatefulWidget {
   final ScanFile file;
 
-  const TextEditWidget({Key? key, required this.file}) : super(key: key);
+  const TextEditWidget({super.key, required this.file});
 
   @override
-  State<TextEditWidget> createState() => _TextEditWidgetState();
+  State<TextEditWidget> createState() => TextEditWidgetState ();
 }
 
-class _TextEditWidgetState extends State<TextEditWidget> {
+class TextEditWidgetState  extends State<TextEditWidget> {
   /// Текущее содержимое текста (при желании связываем с EditableMovableText)
-  String _text = 'Нажмите для редактирования';
+  String _text = 'Tap to edit';
 
   /// Текущий цвет текста
   Color _textColor = Colors.black;
@@ -32,10 +31,12 @@ class _TextEditWidgetState extends State<TextEditWidget> {
   /// Текущая позиция текста (если хотим её отслеживать сверху)
   Offset _textOffset = const Offset(100, 100);
 
+  bool isEditMode = false;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Scaffold сам по себе занимает весь экран.
+      backgroundColor: AppColors.background,
       body: SizedBox.expand(
         // SizedBox.expand даст Stack`у и всем вложенным элементам
         // чёткие размеры (ширина/высота экрана).
@@ -53,6 +54,7 @@ class _TextEditWidgetState extends State<TextEditWidget> {
                     borderRadius: const BorderRadius.all(Radius.circular(12)),
                     child: Image.file(
                       File(widget.file.path),
+                      key: UniqueKey(),
                       fit: BoxFit.cover,
                     ),
                   ),
@@ -66,7 +68,7 @@ class _TextEditWidgetState extends State<TextEditWidget> {
             DraggableScrollableSheet(
               initialChildSize: 0.5,
               minChildSize: 0.2,
-              maxChildSize: 0.5,
+              maxChildSize: 0.6,
               builder: (context, scrollController) {
                 return Container(
                   decoration: const BoxDecoration(
@@ -88,7 +90,7 @@ class _TextEditWidgetState extends State<TextEditWidget> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 8),
 
                       // Настройка размера шрифта
                       Text(
@@ -101,6 +103,7 @@ class _TextEditWidgetState extends State<TextEditWidget> {
                           Text('Small', style: AppTextStyle.exo16),
                           Expanded(
                             child: GradientSlider(
+                              isActive: isEditMode,
                               onChanged: (val) {
                                 setState(() {
                                   _fontSize = val;
@@ -148,7 +151,7 @@ class _TextEditWidgetState extends State<TextEditWidget> {
             /// (3) Текст, который можно перетаскивать и редактировать
             /// Ставим последним в Stack, чтобы был "поверх всего".
             Positioned.fill(
-              child: EditableMovableText(
+              child: EditableMovableResizableText(
                 initialPosition: _textOffset,
                 initialText: _text,
                 textColor: _textColor,
@@ -161,6 +164,12 @@ class _TextEditWidgetState extends State<TextEditWidget> {
                 onTextChanged: (newText) {
                   setState(() {
                     _text = newText;
+                    isEditMode = false;
+                  });
+                },
+                isEditMode: (bool value) {
+                  setState(() {
+                    isEditMode = value;
                   });
                 },
               ),
@@ -188,29 +197,26 @@ class _TextEditWidgetState extends State<TextEditWidget> {
           shape: BoxShape.circle,
           border: isSelected
               ? Border.all(color: AppColors.black, width: 3)
-              : (showBorder ? Border.all(color: AppColors.greyIcon, width: 2) : null),
+              : (showBorder
+                  ? Border.all(color: AppColors.greyIcon, width: 2)
+                  : null),
         ),
       ),
     );
   }
 
-  /// Пример сохранения текста на само изображение (если нужно)
+  /// Функция сохранения текста в изображение
   Future<void> saveTextInImage() async {
     try {
       final originalFile = File(widget.file.path);
-
-      // 1. Считываем исходное изображение
       final bytes = await originalFile.readAsBytes();
       final decoded = img.decodeImage(bytes);
       if (decoded == null) {
         throw Exception('Не удалось декодировать изображение');
       }
-
-      // 2. Переводим координаты в целые пиксели (упрощённый вариант)
+      // Преобразуем координаты в пиксели (упрощённо)
       final int xPos = _textOffset.dx.toInt();
       final int yPos = _textOffset.dy.toInt();
-
-      // 3. Рисуем строку (встроенный шрифт подходит только для латиницы)
       img.drawString(
         decoded,
         _text,
@@ -218,20 +224,17 @@ class _TextEditWidgetState extends State<TextEditWidget> {
         y: yPos,
         font: img.arial14,
       );
-
-      // 4. Кодируем обратно
       final newBytes = img.encodePng(decoded);
-
-      // 5. Перезаписываем файл
       await originalFile.writeAsBytes(newBytes);
-
-      if (!mounted) return;
+      imageCache.clear();
+      imageCache.clearLiveImages();
+      final fileImage = FileImage(File(widget.file.path));
+      await fileImage.evict();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Изображение перезаписано успешно')),
       );
     } catch (e) {
-      debugPrint('Ошибка при сохранении: $e');
-      if (!mounted) return;
+      debugPrint('Ошибка при сохранении текста: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Ошибка при сохранении: $e')),
       );
