@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:image/image.dart' as img;
 import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
 import 'package:owl_tech_pdf_scaner/app/app_text_style.dart';
 import 'package:owl_tech_pdf_scaner/widgets/%D1%81ustom_slider.dart';
@@ -250,40 +249,33 @@ class TextEditWidgetState extends State<TextEditWidget> {
       // Рисуем исходное изображение.
       canvas.drawImage(originalImage, Offset.zero, Paint());
 
-      // 4. Рисуем текст.
-      // Масштабируем позицию текста: _textOffset – координаты на экране (displayed),
-      // переводим их в координаты исходного изображения.
+      // 4. Рисуем текст с использованием TextPainter для поддержки многострочности.
       final double drawX = _textOffset.dx * scaleX;
       final double drawY = _textOffset.dy * scaleY;
       debugPrint("Позиция текста на изображении: x = $drawX, y = $drawY");
 
-      // Создаём стиль параграфа.
-      final ui.ParagraphStyle paragraphStyle = ui.ParagraphStyle(
-        textAlign: TextAlign.left,
-        // можно задать maxLines, ellipsis и т.д.
+      final textSpan = TextSpan(
+        text: _text,
+        style: TextStyle(
+          fontSize: _fontSize * scaleX, // масштабирование размера шрифта
+          color: _textColor,
+        ),
       );
-      // Масштабируем размер шрифта также (например, по scaleX)
-      final ui.TextStyle textStyle = ui.TextStyle(
-        color: _textColor,
-        fontSize: _fontSize * scaleX, // масштабирование размера шрифта
+      final textPainter = TextPainter(
+        text: textSpan,
+        textDirection: TextDirection.ltr,
       );
-      final ui.ParagraphBuilder paragraphBuilder = ui.ParagraphBuilder(paragraphStyle)
-        ..pushStyle(textStyle)
-        ..addText(_text);
-      // Задаём ограничение по ширине – здесь можно использовать максимальную ширину текста на изображении.
-      final ui.Paragraph paragraph = paragraphBuilder.build();
-      paragraph.layout(ui.ParagraphConstraints(width: displayedWidth * scaleX));
-      debugPrint("Параграф сформирован, ширина: ${displayedWidth * scaleX}");
-
-      // Рисуем текст на канве.
-      canvas.drawParagraph(paragraph, Offset(drawX, drawY));
+      // Ограничиваем максимальную ширину для переноса строк.
+      textPainter.layout(maxWidth: displayedWidth * scaleX);
+      textPainter.paint(canvas, Offset(drawX, drawY));
       debugPrint("Текст отрисован на канве");
 
       // 5. Получаем итоговое изображение.
       final ui.Picture picture = recorder.endRecording();
-      final ui.Image finalImage = await picture.toImage(originalWidth, originalHeight);
+      final ui.Image finalImage =
+          await picture.toImage(originalWidth, originalHeight);
       final ByteData? finalByteData =
-      await finalImage.toByteData(format: ui.ImageByteFormat.png);
+          await finalImage.toByteData(format: ui.ImageByteFormat.png);
       if (finalByteData == null) {
         debugPrint('Не удалось получить данные итогового изображения');
         return;
@@ -303,7 +295,4 @@ class TextEditWidgetState extends State<TextEditWidget> {
       debugPrint('Ошибка при сохранении изображения с текстом: $e');
     }
   }
-
-
-
 }

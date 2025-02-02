@@ -24,7 +24,9 @@ class PdfEditScreen extends StatefulWidget {
 class _PdfEditScreenState extends State<PdfEditScreen> {
   int _selectedIndex = 0;
   int _oldIndex = 0;
-  int _penModeCount = 0; // Счётчик использования режима Pen
+  // Флаг подписки пользователя (можно заменить логикой проверки подписки)
+  bool _hasSubscription = false;
+  late int _penModeCount; // Счётчик использования режима Pen
 
   // Глобальные ключи для вызова функций сохранения в каждом режиме
   final GlobalKey<CropWidgetState> _cropKey = GlobalKey<CropWidgetState>();
@@ -35,6 +37,7 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
 
   @override
   void initState() {
+    _penModeCount = 0;
     _pages = [
       // 0. Режим обрезки
       CropWidget(
@@ -92,39 +95,46 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
     );
   }
 
-  // Stub‑вариант функции для преобразования и шаринга файла в PDF.
+  /// Stub‑вариант функции для преобразования и шаринга файла в PDF.
   Future<void> _sharePdfFile() async {
-    // Здесь реализуйте преобразование аннотированного изображения в PDF
+    // Реализуйте преобразование аннотированного изображения в PDF
     // и вызов плагина, например, share_plus.
     debugPrint("Реализуйте логику шаринга PDF-файла");
   }
 
+  /// Обработчик изменения выбранного пункта меню.
   void _onIndexChanged(int newIndex) async {
-    // При переходе из режима Crop сохраняем изменения.
+    print("Выбранный индекс: $_selectedIndex, Старый индекс: $_oldIndex");
+
+    // Если мы покидаем текущий режим, сохраняем изменения
     if (_oldIndex == 0 && newIndex != 0) {
       await _cropKey.currentState?.saveCrop();
+      setState(() {});
     }
-    // При переходе из режима текста сохраняем текст.
     if (_oldIndex == 1 && newIndex != 1) {
       await _textKey.currentState?.saveTextInImage();
+      setState(() {});
     }
-    // При переходе из режима Pen сохраняем аннотации.
     if (_oldIndex == 2 && newIndex != 2) {
       await _penKey.currentState?.saveAnnotatedImage();
+      setState(() {});
     }
 
-    // Если переключаемся в режим Pen, учитываем лимит использования.
+    // Если выбран режим Pen
     if (newIndex == 2) {
       _penModeCount++;
-      if (_penModeCount > 2) {
+
+      if (_penModeCount > 1 && !_hasSubscription) {
+        await _penKey.currentState?.saveAnnotatedImage();
+        setState(() {});
         bool? allowed = await _showSubscriptionDialog();
         if (allowed != true) {
-          // Если пользователь отменяет, остаёмся в предыдущем режиме.
-          return;
+          return; // Не обновляем состояние, остаёмся в предыдущем режиме
         }
       }
     }
 
+    // Обновляем состояние экрана
     setState(() {
       _selectedIndex = newIndex;
       _oldIndex = newIndex;

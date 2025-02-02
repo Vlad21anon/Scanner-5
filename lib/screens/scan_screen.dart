@@ -13,6 +13,7 @@ import 'package:owl_tech_pdf_scaner/screens/scanning_files_screen.dart';
 import 'package:owl_tech_pdf_scaner/services/navigation_service.dart';
 import '../gen/assets.gen.dart';
 import '../widgets/custom_circular_button.dart';
+import '../widgets/document_scanner_widget.dart';
 import '../widgets/photo_toggle.dart';
 
 class ScanScreen extends StatefulWidget {
@@ -31,6 +32,9 @@ class _ScanScreenState extends State<ScanScreen> {
   Future<void>? _initializeControllerFuture;
 
   final navigation = NavigationService();
+
+  final GlobalKey<DocumentScannerWidgetState> scannerKey =
+      GlobalKey<DocumentScannerWidgetState>();
 
   @override
   void initState() {
@@ -131,24 +135,27 @@ class _ScanScreenState extends State<ScanScreen> {
         children: [
           // Тут вместо контейнера - превью камеры
           // Используем FutureBuilder, чтобы дождаться инициализации камеры
+          // Positioned.fill(
+          //   child: FutureBuilder<void>(
+          //     future: _initializeControllerFuture,
+          //     builder: (context, snapshot) {
+          //       if (snapshot.connectionState == ConnectionState.done) {
+          //         // Если инициализировалась — показываем превью
+          //         return Column(
+          //           children: [
+          //             CameraPreview(_cameraController),
+          //             Expanded(child: Container(color: AppColors.black)),
+          //           ],
+          //         );
+          //       } else {
+          //         // Иначе показываем лоадер
+          //         return const Center(child: CircularProgressIndicator());
+          //       }
+          //     },
+          //   ),
+          // ),
           Positioned.fill(
-            child: FutureBuilder<void>(
-              future: _initializeControllerFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.done) {
-                  // Если инициализировалась — показываем превью
-                  return Column(
-                    children: [
-                      CameraPreview(_cameraController),
-                      Expanded(child: Container(color: AppColors.black)),
-                    ],
-                  );
-                } else {
-                  // Иначе показываем лоадер
-                  return const Center(child: CircularProgressIndicator());
-                }
-              },
-            ),
+            child: DocumentScannerWidget(key: scannerKey),
           ),
 
           // Кнопки управления (внизу)
@@ -228,7 +235,28 @@ class _ScanScreenState extends State<ScanScreen> {
 
                           // Кнопка "сделать снимок"
                           GestureDetector(
-                            onTap: () => _takePhoto(context),
+                            onTap: () async {
+                              final croppedPath = await scannerKey.currentState
+                                  ?.cropImage();
+                              debugPrint('--------------------------------------------------------------------$croppedPath----------------------------------------------------------------------------');
+                              if (croppedPath != null &&
+                                  croppedPath.isNotEmpty) {
+                                // Добавляем файл через Cubit или другой механизм
+                                context
+                                    .read<ScanFilesCubit>()
+                                    .addFile(croppedPath);
+                                context.read<FilesCubit>().addFile(croppedPath);
+
+                                // Если одиночный режим — сразу уходим на экран сканирования
+                                if (!isMultiPhoto) {
+                                  final files = context.read<ScanFilesCubit>().state;
+                                  navigation.navigateTo(
+                                    context,
+                                    PdfEditScreen(file: files.last),
+                                  );
+                                }
+                              }
+                            },
                             child: Assets.images.shutter.image(
                               width: 72,
                               height: 72,

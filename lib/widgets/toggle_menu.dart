@@ -20,12 +20,19 @@ class ToggleMenu extends StatefulWidget {
 class _ToggleMenuState extends State<ToggleMenu> {
   int _selectedIndex = 0;
 
-  /// Переключаем «по кругу» при нажатии на Select.
+  /// При нажатии на кнопку "Select" переключаем пункты.
+  /// Если выбран последний элемент (Pen, индекс 2), переключение не происходит.
   void _onSelectPressed() {
     setState(() {
-      _selectedIndex = (_selectedIndex + 1) % 3;
+      if (_selectedIndex < 2) {
+        _selectedIndex++;
+        widget.onIndexChanged?.call(_selectedIndex);
+      } else {
+        // Если уже выбран Pen, можно повторно вызвать onIndexChanged
+        // чтобы, например, инициировать проверку подписки.
+        widget.onIndexChanged?.call(_selectedIndex);
+      }
     });
-    widget.onIndexChanged?.call(_selectedIndex);
   }
 
   @override
@@ -125,7 +132,7 @@ class _ToggleMenuState extends State<ToggleMenu> {
               icon.image(
                 width: iconWidth - 5,
                 height: iconHeight - 5,
-                color: isSelected ? AppColors.white : AppColors.greyIcon,
+                color: AppColors.white,
               ),
             if (!isSelected)
               SizedBox(
@@ -134,7 +141,7 @@ class _ToggleMenuState extends State<ToggleMenu> {
                 child: icon.image(
                   width: iconWidth,
                   height: iconHeight,
-                  color: isSelected ? AppColors.white : AppColors.greyIcon,
+                  color: AppColors.greyIcon,
                 ),
               ),
             if (isSelected) ...[
