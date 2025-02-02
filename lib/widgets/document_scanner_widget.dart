@@ -7,18 +7,16 @@ import 'package:flutter/foundation.dart'; // для compute
 import 'package:flutter/material.dart';
 import 'package:opencv_dart/opencv_dart.dart' as cv;
 import 'package:image/image.dart' as img;
+import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
+import 'package:owl_tech_pdf_scaner/widgets/paper_border_painter.dart';
 import 'package:path_provider/path_provider.dart'; // для временной папки
 import 'package:path/path.dart' as path;
 
-
 /// Виджет, который реализует сканирование документа с использованием камеры.
 /// После нажатия на кнопку «Сфотографировать» происходит обработка изображения в отдельном изоляте.
-/// Если границы успешно обнаружены, создаётся файл с обрезанным изображением, и путь к нему возвращается.
 class DocumentScannerWidget extends StatefulWidget {
   const DocumentScannerWidget({super.key});
 
-  /// Функция, возвращающая результат сканирования – путь к обрезанному изображению.
-  /// Обычно её можно вызывать из Navigator.push(), ожидая результат.
   @override
   State<DocumentScannerWidget> createState() => DocumentScannerWidgetState();
 }
@@ -30,12 +28,11 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
   List<Offset>? _paperCorners; // Найденные 4 угла (исходные координаты)
   Size? _cameraImageSize; // Размер исходного кадра (width, height)
   Uint8List? _lastPngBytes; // Последний обработанный кадр в PNG
-  Uint8List? _croppedImage; // Обрезанное изображение
   String? _croppedImagePath;
 
   // Дополнительные параметры для корректировки смещения
-  double offsetAdjustmentX = -45;
-  double offsetAdjustmentY = 0.0;
+  double offsetAdjustmentX = 0;
+  double offsetAdjustmentY = 5;//-115;
 
   @override
   void initState() {
@@ -65,6 +62,7 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
 
   @override
   void dispose() {
+    _controller.stopImageStream();
     _controller.dispose();
     super.dispose();
   }
@@ -79,21 +77,31 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
     final planeU = image.planes[1];
     final planeV = image.planes[2];
 
+    // Получаем параметры для U/V-плоскостей:
+    final int uvRowStride = planeU.bytesPerRow;
+    final int uvPixelStride = planeU.bytesPerPixel ?? 0;
+
     for (int y = 0; y < height; y++) {
       for (int x = 0; x < width; x++) {
+        // Индекс для Y-плоскости (полное разрешение)
         int yp = planeY.bytes[y * planeY.bytesPerRow + x];
-        int uvX = x ~/ 2;
-        int uvY = y ~/ 2;
-        int uvIndex = uvY * planeU.bytesPerRow + uvX;
-        int up = planeU.bytes[uvIndex];
-        int vp = planeV.bytes[uvIndex];
 
+        // Вычисляем индекс для U/V-плоскостей с учетом субдискретизации
+        int uvIndex = (y ~/ 2) * uvRowStride + (x ~/ 2) * uvPixelStride;
+
+        // Меняем местами: берём U из planeV и V из planeU
+        int up = planeV.bytes[uvIndex];
+        int vp = planeU.bytes[uvIndex];
+
+        // Приводим значения к диапазону и вычитаем смещение
         double yVal = yp.toDouble();
         double uVal = up.toDouble() - 128.0;
         double vVal = vp.toDouble() - 128.0;
 
+        // Преобразование YUV в RGB по стандартной формуле
         int r = (yVal + 1.402 * vVal).round().clamp(0, 255);
-        int g = (yVal - 0.344136 * uVal - 0.714136 * vVal).round().clamp(0, 255);
+        int g =
+            (yVal - 0.344136 * uVal - 0.714136 * vVal).round().clamp(0, 255);
         int b = (yVal + 1.772 * uVal).round().clamp(0, 255);
 
         rgbImage.setPixelRgba(x, y, r, g, b, 255);
@@ -131,9 +139,11 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
         debugPrint('Corner $i: ${corners[i]}');
       }
 
-      setState(() {
-        _paperCorners = corners;
-      });
+      if (mounted) {
+        setState(() {
+          _paperCorners = corners;
+        });
+      }
     } catch (e) {
       debugPrint("Ошибка в изоляте: $e");
     } finally {
@@ -143,7 +153,9 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
 
   /// Функция, вызываемая при нажатии на кнопку "Обрезать фото"
   Future<String?> cropImage() async {
-    if (_lastPngBytes == null || _paperCorners == null || _paperCorners!.length != 4) {
+    if (_lastPngBytes == null ||
+        _paperCorners == null ||
+        _paperCorners!.length != 4) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Нет корректного контура для обрезки')),
       );
@@ -172,46 +184,49 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
         await file.writeAsBytes(croppedBytes);
 
         // Обновляем состояние: сохраняем байты и путь к файлу
-        setState(() {
-          _croppedImage = croppedBytes;
-          _croppedImagePath = filePath; // Объявите эту переменную в вашем классе
-        });
+        if (mounted) {
+          setState(() {
+            _croppedImagePath = filePath;
+          });
+        }
 
         return _croppedImagePath;
       } catch (e) {
         debugPrint("Ошибка при сохранении файла: $e");
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ошибка при сохранении изображения')),
-        );
       }
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Не удалось обрезать изображение')),
-      );
-    }
+    } else {}
     return null;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.black,
       body: _isCameraInitialized
-          ? Stack(
-        children: [
-          CameraPreview(_controller),
-          if (_paperCorners != null && _cameraImageSize != null)
-            CustomPaint(
-              painter: PaperBorderPainter(
-                corners: _paperCorners!,
-                cameraImageSize: _cameraImageSize!,
-                rotateClockwise: true,
-                offsetAdjustmentX: offsetAdjustmentX,
-                offsetAdjustmentY: offsetAdjustmentY,
+          ? Center(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      CameraPreview(_controller),
+                      if (_paperCorners != null && _cameraImageSize != null)
+                        CustomPaint(
+                          size:
+                              Size(constraints.maxWidth, constraints.maxHeight),
+                          painter: PaperBorderPainter(
+                            corners: _paperCorners!,
+                            cameraImageSize: _cameraImageSize!,
+                            rotateClockwise: true,
+                            offsetAdjustmentX: offsetAdjustmentX,
+                            offsetAdjustmentY: offsetAdjustmentY,
+                          ),
+                        ),
+                    ],
+                  );
+                },
               ),
-              child: Container(),
-            ),
-        ],
-      )
+            )
           : const Center(child: CircularProgressIndicator()),
     );
   }
@@ -222,30 +237,30 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
 /// 'pngBytes' – Uint8List с PNG-данными,
 /// 'width', 'height' – размеры исходного кадра.
 /// Возвращает List<List<double>> – список 4-х точек, каждая из которых представлена как [x, y].
-Future<List<List<double>>> processFrameInIsolate(Map<String, dynamic> params) async {
+Future<List<List<double>>> processFrameInIsolate(
+    Map<String, dynamic> params) async {
   try {
     Uint8List pngBytes = params['pngBytes'];
-    int width = params['width'];
-    int height = params['height'];
 
     // Декодируем изображение в cv.Mat
     cv.Mat mat = cv.imdecode(pngBytes, cv.IMREAD_COLOR);
 
     cv.Mat gray = await cv.cvtColorAsync(mat, cv.COLOR_BGR2GRAY);
     cv.Mat blur = await cv.gaussianBlurAsync(gray, (5, 5), 0);
-    cv.Mat edges = await cv.cannyAsync(blur, 50, 150);
+    cv.Mat edges = await cv.cannyAsync(blur, 50, 300, apertureSize: 3);
 
-    var contoursTuple = await cv.findContours(edges, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+    var contoursTuple =
+        cv.findContours(edges, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
     var contours = contoursTuple.$1;
 
     dynamic paperContour;
     double maxArea = 0;
 
     for (var contour in contours) {
-      double peri = await cv.arcLength(contour, true);
-      var approx = await cv.approxPolyDP(contour, 0.02 * peri, true);
+      double peri = cv.arcLength(contour, true);
+      var approx = cv.approxPolyDP(contour, 0.02 * peri, true);
       if (approx.length == 4) {
-        double area = await cv.contourArea(approx);
+        double area = cv.contourArea(approx);
         if (area > maxArea && area > 1000) {
           maxArea = area;
           paperContour = approx;
@@ -273,7 +288,6 @@ Future<List<List<double>>> processFrameInIsolate(Map<String, dynamic> params) as
     return [];
   }
 }
-
 
 /// Упорядочивает 4 точки так, чтобы получилась последовательность:
 /// [верхний левый, верхний правый, нижний правый, нижний левый]
@@ -313,6 +327,7 @@ List<cv.Point2f> orderPoints(List<cv.Point2f> pts) {
   }
   return [tl, tr, br, bl];
 }
+
 /// Функция, выполняемая в изоляте для обрезки изображения по найденному контуру.
 /// Ожидает Map с ключами:
 /// 'pngBytes' – исходное изображение в PNG,
@@ -323,13 +338,13 @@ Future<Uint8List> cropFrameInIsolate(Map<String, dynamic> params) async {
   try {
     // Исходные данные
     Uint8List pngBytes = params['pngBytes'];
-    List<dynamic> cornersDynamic = params['corners']; // Ожидается список вида [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
-    int origWidth = params['width'];
-    int origHeight = params['height'];
+    List<dynamic> cornersDynamic = params[
+        'corners']; // Ожидается список вида [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
 
     // Декодируем исходное изображение в cv.Mat в цветном режиме
     cv.Mat mat = cv.imdecode(pngBytes, cv.IMREAD_COLOR);
-    debugPrint("Исходное изображение: ширина = ${mat.width}, высота = ${mat.height}, channels = ${mat.channels}");
+    debugPrint(
+        "Исходное изображение: ширина = ${mat.width}, высота = ${mat.height}, channels = ${mat.channels}");
 
     // Преобразуем список углов в список Point2f
     List<cv.Point2f> srcPoints = cornersDynamic
@@ -343,23 +358,29 @@ Future<Uint8List> cropFrameInIsolate(Map<String, dynamic> params) async {
 
     // Упорядочиваем точки в порядке: верхний левый, верхний правый, нижний правый, нижний левый
     List<cv.Point2f> orderedPoints = orderPoints(srcPoints);
-    debugPrint("Упорядоченные точки: ${orderedPoints.map((pt) => "(${pt.x}, ${pt.y})").join(', ')}");
+    debugPrint(
+        "Упорядоченные точки: ${orderedPoints.map((pt) => "(${pt.x}, ${pt.y})").join(', ')}");
 
     // Вычисляем ширину итогового изображения как максимум из расстояний между верхними и нижними сторонами:
-    double widthTop = math.sqrt(math.pow(orderedPoints[1].x - orderedPoints[0].x, 2) +
-        math.pow(orderedPoints[1].y - orderedPoints[0].y, 2));
-    double widthBottom = math.sqrt(math.pow(orderedPoints[2].x - orderedPoints[3].x, 2) +
-        math.pow(orderedPoints[2].y - orderedPoints[3].y, 2));
+    double widthTop = math.sqrt(
+        math.pow(orderedPoints[1].x - orderedPoints[0].x, 2) +
+            math.pow(orderedPoints[1].y - orderedPoints[0].y, 2));
+    double widthBottom = math.sqrt(
+        math.pow(orderedPoints[2].x - orderedPoints[3].x, 2) +
+            math.pow(orderedPoints[2].y - orderedPoints[3].y, 2));
     double maxWidth = math.max(widthTop, widthBottom);
 
     // Вычисляем высоту итогового изображения как максимум из расстояний между левыми и правыми сторонами:
-    double heightLeft = math.sqrt(math.pow(orderedPoints[3].x - orderedPoints[0].x, 2) +
-        math.pow(orderedPoints[3].y - orderedPoints[0].y, 2));
-    double heightRight = math.sqrt(math.pow(orderedPoints[2].x - orderedPoints[1].x, 2) +
-        math.pow(orderedPoints[2].y - orderedPoints[1].y, 2));
+    double heightLeft = math.sqrt(
+        math.pow(orderedPoints[3].x - orderedPoints[0].x, 2) +
+            math.pow(orderedPoints[3].y - orderedPoints[0].y, 2));
+    double heightRight = math.sqrt(
+        math.pow(orderedPoints[2].x - orderedPoints[1].x, 2) +
+            math.pow(orderedPoints[2].y - orderedPoints[1].y, 2));
     double maxHeight = math.max(heightLeft, heightRight);
 
-    debugPrint("Вычисленные размеры итогового изображения: maxWidth = $maxWidth, maxHeight = $maxHeight");
+    debugPrint(
+        "Вычисленные размеры итогового изображения: maxWidth = $maxWidth, maxHeight = $maxHeight");
 
     // Определяем целевые точки для перспективного преобразования
     List<cv.Point2f> dstPoints = [
@@ -376,28 +397,36 @@ Future<Uint8List> cropFrameInIsolate(Map<String, dynamic> params) async {
     debugPrint("Матрица перспективного преобразования получена");
 
     // Применяем перспективное преобразование для получения "выпрямленного" изображения
-    cv.Mat warped = await cv.warpPerspective(
+    cv.Mat warped = cv.warpPerspective(
       mat,
       perspectiveMatrix,
       (maxWidth.toInt(), maxHeight.toInt()),
     );
-    debugPrint("Изображение после warpPerspective: ширина = ${warped.width}, высота = ${warped.height}, channels = ${warped.channels}");
+    debugPrint(
+        "Изображение после warpPerspective: ширина = ${warped.width}, высота = ${warped.height}, channels = ${warped.channels}");
+
 
     // Преобразуем цветовое пространство из BGR (стандарт OpenCV) в RGB
     cv.Mat rgbMat = cv.cvtColor(warped, cv.COLOR_BGR2RGB);
     debugPrint("Изображение после cvtColor: channels = ${rgbMat.channels}");
 
+    // Поворачиваем изображение вправо (на 90° по часовой стрелке)
+    cv.Mat rotated = cv.rotate(rgbMat, cv.ROTATE_90_CLOCKWISE);
+    debugPrint("Изображение повернуто вправо: ширина = ${rotated.width}, высота = ${rotated.height}");
+
     // Конвертируем полученное цветное изображение в PNG
-    final result = cv.imencode(".png", rgbMat);
+    final result = cv.imencode(".png", rotated);
     if (!result.$1) {
       throw Exception("Ошибка при кодировании изображения в PNG");
     }
     Uint8List croppedPng = result.$2;
-    debugPrint("Размер обрезанного изображения (PNG): ${croppedPng.lengthInBytes} байт");
+    debugPrint(
+        "Размер обрезанного изображения (PNG): ${croppedPng.lengthInBytes} байт");
 
     // Освобождаем ресурсы
     mat.dispose();
     perspectiveMatrix.dispose();
+    rotated.dispose();
     warped.dispose();
     rgbMat.dispose();
     srcVec.dispose();
@@ -418,105 +447,3 @@ List<cv.Point> convertToPointList(List<List<double>> list) {
 List<cv.Point> convertPoints(List<cv.Point2f> points2f) {
   return points2f.map((pt) => cv.Point(pt.x.round(), pt.y.round())).toList();
 }
-
-/// CustomPainter, который получает список 4 углов (в исходных координатах), размер кадра и параметры поворота.
-/// Если rotateClockwise == true, применяется формула:
-///     newX = (cameraImageSize.height - y)
-///     newY = x
-/// Затем точки масштабируются с учетом вычисленного scale и отступов (offsetX, offsetY),
-/// а также добавляются корректирующие смещения.
-class PaperBorderPainter extends CustomPainter {
-  final List<Offset> corners;
-  final Size cameraImageSize;
-  final bool rotateClockwise;
-  final double offsetAdjustmentX;
-  final double offsetAdjustmentY;
-
-  PaperBorderPainter({
-    required this.corners,
-    required this.cameraImageSize,
-    this.rotateClockwise = false,
-    this.offsetAdjustmentX = 0,
-    this.offsetAdjustmentY = 0,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (corners.length != 4) return;
-
-    // Преобразуем точки с учетом поворота
-    List<Offset> transformedCorners = corners.map((pt) {
-      if (rotateClockwise) {
-        // Поворот по часовой стрелке: (x, y) -> (cameraImageSize.height - y, x)
-        return Offset(cameraImageSize.height - pt.dy, pt.dx);
-      } else {
-        // Поворот против часовой стрелки: (x, y) -> (pt.dy, cameraImageSize.width - pt.dx)
-        return Offset(pt.dy, cameraImageSize.width - pt.dx);
-      }
-    }).toList();
-
-    // Новый размер изображения после поворота
-    final newImageSize = rotateClockwise
-        ? Size(cameraImageSize.height, cameraImageSize.width)
-        : Size(cameraImageSize.width, cameraImageSize.height);
-
-    // Вычисляем коэффициент масштабирования (сохраняя пропорции) и отступы для центрирования
-    final scale = math.min(size.width / newImageSize.width, size.height / newImageSize.height);
-    final drawWidth = newImageSize.width * scale;
-    final drawHeight = newImageSize.height * scale;
-    final offsetX = (size.width - drawWidth) / 2;
-    final offsetY = (size.height - drawHeight) / 2;
-
-    // Масштабируем и смещаем точки, добавляя корректирующие смещения
-    final List<Offset> scaledCorners = transformedCorners.map((pt) {
-      return Offset(pt.dx * scale + offsetX + offsetAdjustmentX,
-          pt.dy * scale + offsetY + offsetAdjustmentY);
-    }).toList();
-
-    // Отладочный вывод преобразованных точек
-    for (int i = 0; i < scaledCorners.length; i++) {
-      debugPrint('Scaled Corner $i: ${scaledCorners[i]}');
-    }
-
-    final linePaint = Paint()
-      ..color = Colors.red
-      ..strokeWidth = 3
-      ..style = PaintingStyle.stroke;
-    final pointPaint = Paint()
-      ..color = Colors.green
-      ..style = PaintingStyle.fill;
-
-    // Рисуем линии между точками
-    final path = Path();
-    path.moveTo(scaledCorners[0].dx, scaledCorners[0].dy);
-    for (int i = 1; i < scaledCorners.length; i++) {
-      path.lineTo(scaledCorners[i].dx, scaledCorners[i].dy);
-    }
-    path.close();
-    canvas.drawPath(path, linePaint);
-
-    // Рисуем кружки и метки для отладки
-    for (int i = 0; i < scaledCorners.length; i++) {
-      canvas.drawCircle(scaledCorners[i], 5, pointPaint);
-      final tp = TextPainter(
-        text: TextSpan(
-          text: "$i",
-          style: const TextStyle(color: Colors.white, fontSize: 14),
-        ),
-        textDirection: TextDirection.ltr,
-      );
-      tp.layout();
-      tp.paint(canvas, scaledCorners[i] + const Offset(6, -6));
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant PaperBorderPainter oldDelegate) {
-    return oldDelegate.corners != corners ||
-        oldDelegate.cameraImageSize != cameraImageSize ||
-        oldDelegate.rotateClockwise != rotateClockwise ||
-        oldDelegate.offsetAdjustmentX != offsetAdjustmentX ||
-        oldDelegate.offsetAdjustmentY != offsetAdjustmentY;
-  }
-}
-

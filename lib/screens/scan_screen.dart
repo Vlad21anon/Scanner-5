@@ -236,9 +236,10 @@ class _ScanScreenState extends State<ScanScreen> {
                           // Кнопка "сделать снимок"
                           GestureDetector(
                             onTap: () async {
-                              final croppedPath = await scannerKey.currentState
-                                  ?.cropImage();
-                              debugPrint('--------------------------------------------------------------------$croppedPath----------------------------------------------------------------------------');
+                              final croppedPath =
+                                  await scannerKey.currentState?.cropImage();
+                              debugPrint(
+                                  '--------------------------------------------------------------------$croppedPath----------------------------------------------------------------------------');
                               if (croppedPath != null &&
                                   croppedPath.isNotEmpty) {
                                 // Добавляем файл через Cubit или другой механизм
@@ -249,7 +250,8 @@ class _ScanScreenState extends State<ScanScreen> {
 
                                 // Если одиночный режим — сразу уходим на экран сканирования
                                 if (!isMultiPhoto) {
-                                  final files = context.read<ScanFilesCubit>().state;
+                                  final files =
+                                      context.read<ScanFilesCubit>().state;
                                   navigation.navigateTo(
                                     context,
                                     PdfEditScreen(file: files.last),
