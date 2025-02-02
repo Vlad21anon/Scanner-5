@@ -9,6 +9,7 @@ import 'package:owl_tech_pdf_scaner/blocs/text_edit_cubit.dart';
 import 'package:owl_tech_pdf_scaner/screens/files_page.dart';
 import 'package:owl_tech_pdf_scaner/screens/settings_page.dart';
 import 'package:owl_tech_pdf_scaner/services/navigation_service.dart';
+import 'package:owl_tech_pdf_scaner/services/permission_service.dart';
 import 'package:owl_tech_pdf_scaner/widgets/custom_navigation_bar.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -69,6 +70,13 @@ class _MainScreenState extends State<MainScreen> {
     FilesPage(),
     SettingsScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Запрашиваем разрешения на камеру и микрофон при запуске экрана
+    PermissionService().requestCameraAndMicrophonePermissions();
+  }
 
   @override
   Widget build(BuildContext context) {

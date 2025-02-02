@@ -55,6 +55,7 @@ class CropWidgetState extends State<CropWidget> {
 
   // Для вычислений обрезки
   Size _containerSize = Size.zero;
+  LocalKey imageKey = UniqueKey();
 
   @override
   void initState() {
@@ -227,6 +228,12 @@ class CropWidgetState extends State<CropWidget> {
     }
   }
 
+  void updateImage(LocalKey key) {
+    setState(() {
+      imageKey = key;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final imagePath = widget.file.path;
@@ -273,6 +280,7 @@ class CropWidgetState extends State<CropWidget> {
                     Positioned.fill(
                       child: Image.file(
                         File(imagePath),
+                        key: imageKey,
                         fit: BoxFit.contain,
                       ),
                     ),

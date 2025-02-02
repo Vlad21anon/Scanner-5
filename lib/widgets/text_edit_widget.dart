@@ -1,17 +1,15 @@
 import 'dart:io';
 import 'dart:ui' as ui;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
 import 'package:owl_tech_pdf_scaner/app/app_text_style.dart';
 import 'package:owl_tech_pdf_scaner/widgets/%D1%81ustom_slider.dart';
 import 'editable_movable_text.dart';
 import '../models/scan_file.dart';
-import 'dart:typed_data';
 
-/// Виджет редактирования текста поверх изображения
 class TextEditWidget extends StatefulWidget {
   final ScanFile file;
-
   const TextEditWidget({super.key, required this.file});
 
   @override
@@ -19,71 +17,69 @@ class TextEditWidget extends StatefulWidget {
 }
 
 class TextEditWidgetState extends State<TextEditWidget> {
-  /// Текущее содержимое текста (при желании связываем с EditableMovableText)
   String _text = 'Tap to edit';
-
-  /// Текущий цвет текста
   Color _textColor = Colors.black;
-
-  /// Текущий размер шрифта
   double _fontSize = 16.0;
-
-  /// Текущая позиция текста (если хотим её отслеживать сверху)
   Offset _textOffset = const Offset(100, 100);
-
   bool isEditMode = false;
-
-  // Создаём GlobalKey для доступа к состоянию EditableMovableResizableText
+  LocalKey imageKey = UniqueKey();
   final GlobalKey<EditableMovableResizableTextState> textEditKey = GlobalKey();
+
+  // Если лишних смещений не нужно, устанавливаем их в 0
+  double textShiftX = 0;
+  double textShiftY = 0;
+
+  void updateImage(LocalKey key) {
+    setState(() {
+      imageKey = key;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SizedBox.expand(
-        // SizedBox.expand даст Stack`у и всем вложенным элементам
-        // чёткие размеры (ширина/высота экрана).
         child: Stack(
           children: [
-            /// (1) Изображение по центру
             Align(
               alignment: Alignment.topCenter,
               child: Padding(
                 padding: const EdgeInsets.only(top: 24),
-                child: SizedBox(
-                  width: 361,
-                  height: 491,
-                  child: ClipRRect(
-                    borderRadius: const BorderRadius.all(Radius.circular(12)),
-                    child: Image.file(
-                      File(widget.file.path),
-                      key: UniqueKey(),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    const double containerWidth = 361;
+                    const double containerHeight = 491;
+                    return SizedBox(
+                      width: containerWidth,
+                      height: containerHeight,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.file(
+                          File(widget.file.path),
+                          key: imageKey,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
-
-            /// (2) DraggableScrollableSheet (панель снизу)
-            /// Помещаем его в Positioned.fill или просто без Positioned,
-            /// чтобы занять всё доступное пространство.
             DraggableScrollableSheet(
-              initialChildSize: 0.5,
-              minChildSize: 0.2,
-              maxChildSize: 0.6,
+              initialChildSize: isEditMode ? 0.6 : 0.45,
+              minChildSize: isEditMode ? 0.6 : 0.2,
+              maxChildSize: isEditMode ? 0.6 : 0.45,
               builder: (context, scrollController) {
                 return Container(
                   decoration: const BoxDecoration(
                     color: Colors.white,
-                    borderRadius:
-                        BorderRadius.vertical(top: Radius.circular(30)),
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
                   ),
                   child: ListView(
                     controller: scrollController,
                     padding: const EdgeInsets.all(16),
                     children: [
-                      // Хендлер (визуальная полоска) для жеста "потянуть"
                       Center(
                         child: Container(
                           width: 110,
@@ -95,12 +91,7 @@ class TextEditWidgetState extends State<TextEditWidget> {
                         ),
                       ),
                       const SizedBox(height: 8),
-
-                      // Настройка размера шрифта
-                      Text(
-                        'Font Size',
-                        style: AppTextStyle.exo20,
-                      ),
+                      Text('Font Size', style: AppTextStyle.exo20),
                       const SizedBox(height: 16),
                       Row(
                         children: [
@@ -120,12 +111,7 @@ class TextEditWidgetState extends State<TextEditWidget> {
                         ],
                       ),
                       const SizedBox(height: 24),
-
-                      // Выбор цвета
-                      Text(
-                        'Color',
-                        style: AppTextStyle.exo20,
-                      ),
+                      Text('Color', style: AppTextStyle.exo20),
                       const SizedBox(height: 16),
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
@@ -151,9 +137,6 @@ class TextEditWidgetState extends State<TextEditWidget> {
                 );
               },
             ),
-
-            /// (3) Текст, который можно перетаскивать и редактировать
-            /// Ставим последним в Stack, чтобы был "поверх всего".
             Positioned.fill(
               child: EditableMovableResizableText(
                 initialPosition: _textOffset,
@@ -171,7 +154,7 @@ class TextEditWidgetState extends State<TextEditWidget> {
                     isEditMode = false;
                   });
                 },
-                isEditMode: (bool value) {
+                isEditMode: (value) {
                   setState(() {
                     isEditMode = value;
                   });
@@ -201,96 +184,56 @@ class TextEditWidgetState extends State<TextEditWidget> {
           shape: BoxShape.circle,
           border: isSelected
               ? Border.all(color: AppColors.black, width: 3)
-              : (showBorder
-                  ? Border.all(color: AppColors.greyIcon, width: 2)
-                  : null),
+              : (showBorder ? Border.all(color: AppColors.greyIcon, width: 2) : null),
         ),
       ),
     );
   }
 
-  /// Функция сохранения текста в изображении.
-  /// При сохранении учитываются положение, цвет и размер текста.
-  /// Функция сохранения изображения, полученного из виджета Text
   Future<void> saveTextInImage() async {
     final path = widget.file.path;
-    if (path.isEmpty) {
-      debugPrint('Файл не задан или путь пуст');
-      return;
-    }
+    if (path.isEmpty || _text == 'Tap to edit') return;
     final file = File(path);
-    if (!await file.exists()) {
-      debugPrint('Файл не найден: $path');
-      return;
-    }
+    if (!await file.exists()) return;
     try {
-      debugPrint("Начало сохранения изображения с текстом");
-
-      // 1. Чтение исходного файла и декодирование изображения.
       final fileBytes = await file.readAsBytes();
       final ui.Codec codec = await ui.instantiateImageCodec(fileBytes);
       final ui.FrameInfo frameInfo = await codec.getNextFrame();
       final ui.Image originalImage = frameInfo.image;
       final int originalWidth = originalImage.width;
       final int originalHeight = originalImage.height;
-      debugPrint("Исходное изображение: ${originalWidth}x${originalHeight}");
-
-      // 2. Задаём размеры отображаемого изображения в UI.
       const double displayedWidth = 361;
       const double displayedHeight = 491;
       final double scaleX = originalWidth / displayedWidth;
       final double scaleY = originalHeight / displayedHeight;
-      debugPrint("Масштабирование: scaleX = $scaleX, scaleY = $scaleY");
-
-      // 3. Создаём PictureRecorder и Canvas.
       final ui.PictureRecorder recorder = ui.PictureRecorder();
       final Canvas canvas = Canvas(recorder);
-
-      // Рисуем исходное изображение.
       canvas.drawImage(originalImage, Offset.zero, Paint());
-
-      // 4. Рисуем текст с использованием TextPainter для поддержки многострочности.
       final double drawX = _textOffset.dx * scaleX;
       final double drawY = _textOffset.dy * scaleY;
-      debugPrint("Позиция текста на изображении: x = $drawX, y = $drawY");
-
       final textSpan = TextSpan(
         text: _text,
-        style: TextStyle(
-          fontSize: _fontSize * scaleX, // масштабирование размера шрифта
-          color: _textColor,
-        ),
+        style: TextStyle(fontSize: _fontSize * scaleX, color: _textColor),
       );
       final textPainter = TextPainter(
         text: textSpan,
         textDirection: TextDirection.ltr,
       );
-      // Ограничиваем максимальную ширину для переноса строк.
       textPainter.layout(maxWidth: displayedWidth * scaleX);
       textPainter.paint(canvas, Offset(drawX, drawY));
-      debugPrint("Текст отрисован на канве");
-
-      // 5. Получаем итоговое изображение.
       final ui.Picture picture = recorder.endRecording();
-      final ui.Image finalImage =
-          await picture.toImage(originalWidth, originalHeight);
-      final ByteData? finalByteData =
-          await finalImage.toByteData(format: ui.ImageByteFormat.png);
-      if (finalByteData == null) {
-        debugPrint('Не удалось получить данные итогового изображения');
-        return;
-      }
+      final ui.Image finalImage = await picture.toImage(originalWidth, originalHeight);
+      final ByteData? finalByteData = await finalImage.toByteData(format: ui.ImageByteFormat.png);
+      if (finalByteData == null) return;
       final Uint8List finalBytes = finalByteData.buffer.asUint8List();
-
-      // 6. Перезаписываем файл.
       await file.writeAsBytes(finalBytes);
-      debugPrint('Изображение с текстом сохранено в тот же файл: $path');
-
-      // Очистка кэша изображений.
+      final FileImage fileImage = FileImage(File(path));
+      await fileImage.evict();
       imageCache.clear();
       imageCache.clearLiveImages();
-      final FileImage fileImage = FileImage(file);
-      await fileImage.evict();
+      setState(() {
+        imageKey = UniqueKey();
+      });
     } catch (e) {
       debugPrint('Ошибка при сохранении изображения с текстом: $e');
     }
