@@ -1,4 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Разрешение для доступа к камере -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Разрешение для доступа к микрофону (запись аудио) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <application
         android:label="PDF Scanner"
         android:name="${applicationName}"
