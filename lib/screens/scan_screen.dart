@@ -133,27 +133,6 @@ class _ScanScreenState extends State<ScanScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // Тут вместо контейнера - превью камеры
-          // Используем FutureBuilder, чтобы дождаться инициализации камеры
-          // Positioned.fill(
-          //   child: FutureBuilder<void>(
-          //     future: _initializeControllerFuture,
-          //     builder: (context, snapshot) {
-          //       if (snapshot.connectionState == ConnectionState.done) {
-          //         // Если инициализировалась — показываем превью
-          //         return Column(
-          //           children: [
-          //             CameraPreview(_cameraController),
-          //             Expanded(child: Container(color: AppColors.black)),
-          //           ],
-          //         );
-          //       } else {
-          //         // Иначе показываем лоадер
-          //         return const Center(child: CircularProgressIndicator());
-          //       }
-          //     },
-          //   ),
-          // ),
           Positioned.fill(
             child: DocumentScannerWidget(key: scannerKey),
           ),

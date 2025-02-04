@@ -48,7 +48,7 @@ class _PhotoToggleState extends State<PhotoToggle> {
     return GestureDetector(
       onTap: toggleSelection,
       child: SizedBox(
-        width: 50,
+        width: 60,
         height: 30,
         child: Center(
           child: Text(

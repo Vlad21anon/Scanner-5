@@ -1,13 +1,13 @@
 import 'dart:math' as math;
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import '../app/app_colors.dart';
 
 /// CustomPainter, который получает список 4 углов (в исходных координатах), размер кадра и параметры поворота.
-/// Если rotateClockwise == true, применяется формула:
+/// Если платформа не iOS, то при rotateClockwise == true применяется формула:
 ///     newX = (cameraImageSize.height - y)
 ///     newY = x
-/// Затем точки масштабируются с учетом вычисленного scale и отступов (offsetX, offsetY),
-/// а также добавляются корректирующие смещения.
+/// Если платформа iOS – точки не меняются.
 class PaperBorderPainter extends CustomPainter {
   final List<Offset> corners;
   final Size cameraImageSize;
@@ -30,21 +30,29 @@ class PaperBorderPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (corners.length != 4) return;
 
-    // Преобразуем точки с учетом поворота
-    List<Offset> transformedCorners = corners.map((pt) {
-      if (rotateClockwise) {
-        // Поворот по часовой стрелке: (x, y) -> (cameraImageSize.height - y, x)
-        return Offset(cameraImageSize.height - pt.dy, pt.dx);
-      } else {
-        // Поворот против часовой стрелки: (x, y) -> (pt.dy, cameraImageSize.width - pt.dx)
-        return Offset(pt.dy, cameraImageSize.width - pt.dx);
-      }
-    }).toList();
+    // Для iOS не выполняем поворот – используем исходные точки,
+    // для остальных платформ применяем преобразование в зависимости от rotateClockwise.
+    List<Offset> transformedCorners;
+    if (Platform.isIOS) {
+      transformedCorners = corners;
+    } else {
+      transformedCorners = corners.map((pt) {
+        if (rotateClockwise) {
+          // Поворот по часовой стрелке: (x, y) -> (cameraImageSize.height - y, x)
+          return Offset(cameraImageSize.height - pt.dy, pt.dx);
+        } else {
+          // Поворот против часовой стрелки: (x, y) -> (pt.dy, cameraImageSize.width - pt.dx)
+          return Offset(pt.dy, cameraImageSize.width - pt.dx);
+        }
+      }).toList();
+    }
 
-    // Новый размер изображения после поворота
-    final newImageSize = rotateClockwise
+    // Новый размер изображения после преобразования.
+    final newImageSize = (!Platform.isIOS)
+        ? (rotateClockwise
         ? Size(cameraImageSize.height, cameraImageSize.width)
-        : Size(cameraImageSize.width, cameraImageSize.height);
+        : Size(cameraImageSize.width, cameraImageSize.height))
+        : cameraImageSize;
 
     // Вычисляем коэффициент масштабирования (сохраняя пропорции) и отступы для центрирования
     final scale = math.min(size.width / newImageSize.width, size.height / newImageSize.height);

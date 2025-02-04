@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart'; // для compute
@@ -13,26 +14,32 @@ import 'package:path_provider/path_provider.dart'; // для временной 
 import 'package:path/path.dart' as path;
 
 /// Виджет, который реализует сканирование документа с использованием камеры.
-/// После нажатия на кнопку «Сфотографировать» происходит обработка изображения в отдельном изоляте.
-class DocumentScannerWidget extends StatefulWidget {
-  const DocumentScannerWidget({super.key});
+class DocumentScannerTest extends StatefulWidget {
+  const DocumentScannerTest({super.key});
 
   @override
-  State<DocumentScannerWidget> createState() => DocumentScannerWidgetState();
+  State<DocumentScannerTest> createState() => DocumentScannerTestState();
 }
 
-class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
+class DocumentScannerTestState extends State<DocumentScannerTest> {
   late CameraController _controller;
   bool _isCameraInitialized = false;
   bool _isProcessing = false;
   List<Offset>? _paperCorners; // Найденные 4 угла (исходные координаты)
   Size? _cameraImageSize; // Размер исходного кадра (width, height)
   Uint8List? _lastPngBytes; // Последний обработанный кадр в PNG
+  Uint8List? _previewPngBytes; // PNG-байты обработанного изображения для предпросмотра
   String? _croppedImagePath;
 
-  // Дополнительные параметры для корректировки смещения
+  // Дополнительные параметры для корректировки (например, смещения)
   double offsetAdjustmentX = 0;
-  double offsetAdjustmentY = 5;//-115;
+  double offsetAdjustmentY = 5;
+
+  // Параметры для алгоритма Canny и аппроксимации
+  double _cannyThreshold1 = 50.0;
+  double _cannyThreshold2 = 150.0;
+  int _apertureSize = 3;
+  double _approxPolyFactor = 0.02;
 
   @override
   void initState() {
@@ -89,21 +96,15 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
       final planeY = image.planes[0];
       final planeUV = image.planes[1];
       final int uvRowStride = planeUV.bytesPerRow;
+      // Обычно для NV12 bytesPerPixel равен 2, так что умножаем (x ~/ 2)*2
 
       for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
           int yp = planeY.bytes[y * planeY.bytesPerRow + x];
           int uvIndex = (y ~/ 2) * uvRowStride + (x ~/ 2) * 2;
-          int u, v;
-          // На iOS предполагаем, что порядок плоскости UV равен [V, U]
-          if (Platform.isIOS) {
-            v = planeUV.bytes[uvIndex];
-            u = planeUV.bytes[uvIndex + 1];
-          } else {
-            // На остальных платформах порядок [U, V]
-            u = planeUV.bytes[uvIndex];
-            v = planeUV.bytes[uvIndex + 1];
-          }
+          // Для NV12 обычно порядок: [U, V]
+          int u = planeUV.bytes[uvIndex];
+          int v = planeUV.bytes[uvIndex + 1];
 
           double yVal = yp.toDouble();
           double uVal = u.toDouble() - 128.0;
@@ -156,8 +157,9 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
     }
   }
 
-  /// Обработка кадра в главном потоке: конвертируем кадр в PNG-байты,
-  /// затем вызываем compute(), который запускает функцию processFrameInIsolate.
+  /// Обработка кадра в главном потоке.
+  /// Конвертирует кадр в PNG, затем вызывает compute() для обработки изображения в изоляте,
+  /// передавая текущие параметры из слайдеров.
   Future<void> _processCameraImage(CameraImage image) async {
     try {
       _cameraImageSize = Size(image.width.toDouble(), image.height.toDouble());
@@ -170,6 +172,10 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
         'pngBytes': pngBytes,
         'width': image.width,
         'height': image.height,
+        'cannyThreshold1': _cannyThreshold1,
+        'cannyThreshold2': _cannyThreshold2,
+        'apertureSize': _apertureSize,
+        'approxPolyFactor': _approxPolyFactor,
       });
 
       if (result == null) {
@@ -192,6 +198,7 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
       // Обновляем состояние: preview всегда показывается,
       // а paperCorners устанавливается только если найдено ровно 4 угла.
       setState(() {
+        _previewPngBytes = previewBytes;
         _paperCorners = corners.length == 4 ? corners : null;
       });
     } catch (e, stackTrace) {
@@ -213,7 +220,7 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
       return null;
     }
 
-    // Передаём в изоляте: PNG-байты, контур, размеры исходного кадра.
+    // Передаём в изолят: PNG-байты, контур, размеры исходного кадра.
     final croppedBytes = await compute(cropFrameInIsolate, {
       'pngBytes': _lastPngBytes,
       // Передаём контур как List<List<double>>
@@ -227,14 +234,14 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
       try {
         // Получаем директорию для документов
         final Directory appDocDir = await getApplicationDocumentsDirectory();
-        // Формируем уникальное имя файла, например, с использованием текущего времени
+        // Формируем уникальное имя файла
         final String fileName =
             "cropped_${DateTime.now().millisecondsSinceEpoch}.png";
         final String filePath = path.join(appDocDir.path, fileName);
         final File file = File(filePath);
         await file.writeAsBytes(croppedBytes);
 
-        // Обновляем состояние: сохраняем байты и путь к файлу
+        // Обновляем состояние
         if (mounted) {
           setState(() {
             _croppedImagePath = filePath;
@@ -245,7 +252,7 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
       } catch (e) {
         debugPrint("Ошибка при сохранении файла: $e");
       }
-    } else {}
+    }
     return null;
   }
 
@@ -254,40 +261,178 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
     return Scaffold(
       backgroundColor: AppColors.black,
       body: _isCameraInitialized
-          ? Center(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return Stack(
-              alignment: Alignment.center,
-              children: [
-                CameraPreview(_controller),
-                if (_paperCorners != null && _cameraImageSize != null)
-                  CustomPaint(
-                    size:
-                    Size(constraints.maxWidth, constraints.maxHeight),
-                    painter: PaperBorderPainter(
-                      corners: _paperCorners!,
-                      cameraImageSize: _cameraImageSize!,
-                      rotateClockwise: true,
-                      offsetAdjustmentX: offsetAdjustmentX,
-                      offsetAdjustmentY: offsetAdjustmentY,
-                    ),
+          ? Stack(
+        children: [
+          // Камера
+          CameraPreview(_controller),
+          // Отображение найденного контура (рамка)
+          if (_paperCorners != null && _cameraImageSize != null)
+            CustomPaint(
+              size: MediaQuery.of(context).size,
+              painter: PaperBorderPainter(
+                corners: _paperCorners!,
+                cameraImageSize: _cameraImageSize!,
+                rotateClockwise: true,
+                offsetAdjustmentX: offsetAdjustmentX,
+                offsetAdjustmentY: offsetAdjustmentY,
+              ),
+            ),
+          // Предпросмотр обработанного изображения (например, краев)
+          if (_previewPngBytes != null)
+            Positioned(
+              top: 40,
+              right: 20,
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.yellow, width: 2),
+                ),
+                width: 150,
+                height: 150,
+                child: Image.memory(
+                  _previewPngBytes!,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+          // Панель со слайдерами параметров
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              color: Colors.black54,
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Слайдер для порога 1 для Canny
+                  Row(
+                    children: [
+                      const Expanded(
+                          child: Text(
+                            "Canny Th1",
+                            style: TextStyle(color: Colors.white),
+                          )),
+                      Expanded(
+                        flex: 3,
+                        child: Slider(
+                          min: 0,
+                          max: 255,
+                          value: _cannyThreshold1,
+                          onChanged: (val) {
+                            setState(() {
+                              _cannyThreshold1 = val;
+                            });
+                          },
+                        ),
+                      ),
+                      Text(
+                        _cannyThreshold1.toStringAsFixed(0),
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ],
                   ),
-              ],
-            );
-          },
-        ),
+                  // Слайдер для порога 2 для Canny
+                  Row(
+                    children: [
+                      const Expanded(
+                          child: Text(
+                            "Canny Th2",
+                            style: TextStyle(color: Colors.white),
+                          )),
+                      Expanded(
+                        flex: 3,
+                        child: Slider(
+                          min: 0,
+                          max: 255,
+                          value: _cannyThreshold2,
+                          onChanged: (val) {
+                            setState(() {
+                              _cannyThreshold2 = val;
+                            });
+                          },
+                        ),
+                      ),
+                      Text(
+                        _cannyThreshold2.toStringAsFixed(0),
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ],
+                  ),
+                  // Слайдер для размера апертуры
+                  Row(
+                    children: [
+                      const Expanded(
+                          child: Text(
+                            "Aperture",
+                            style: TextStyle(color: Colors.white),
+                          )),
+                      Expanded(
+                        flex: 3,
+                        child: Slider(
+                          min: 3,
+                          max: 7,
+                          divisions: 2,
+                          value: _apertureSize.toDouble(),
+                          onChanged: (val) {
+                            setState(() {
+                              _apertureSize = val.toInt();
+                            });
+                          },
+                        ),
+                      ),
+                      Text(
+                        _apertureSize.toString(),
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ],
+                  ),
+                  // Слайдер для коэффициента аппроксимации полигона
+                  Row(
+                    children: [
+                      const Expanded(
+                          child: Text(
+                            "Approx Factor",
+                            style: TextStyle(color: Colors.white),
+                          )),
+                      Expanded(
+                        flex: 3,
+                        child: Slider(
+                          min: 0.0,
+                          max: 0.1,
+                          divisions: 100,
+                          value: _approxPolyFactor,
+                          onChanged: (val) {
+                            setState(() {
+                              _approxPolyFactor = val;
+                            });
+                          },
+                        ),
+                      ),
+                      Text(
+                        _approxPolyFactor.toStringAsFixed(3),
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       )
           : const Center(child: CircularProgressIndicator()),
     );
   }
 }
 
-/// Функция, выполняемая в изоляте для определения контура документа.
+/// Функция, выполняемая в изоляте для определения контура документа и формирования предпросмотра.
 /// Принимает Map с ключами:
-/// 'pngBytes' – Uint8List с PNG-данными,
-/// 'width', 'height' – размеры исходного кадра.
-/// Возвращает List<List<double>> – список 4-х точек, каждая из которых представлена как [x, y].
+/// • 'pngBytes' – Uint8List с PNG-данными,
+/// • 'width', 'height' – размеры исходного кадра,
+/// • 'cannyThreshold1', 'cannyThreshold2', 'apertureSize' – параметры для cv.cannyAsync,
+/// • 'approxPolyFactor' – коэффициент для аппроксимации контура.
+// Функция, выполняемая в изоляте для обработки изображения и вычисления углов (без поворота точек)
 Future<Map<String, dynamic>> processFrameInIsolate(
     Map<String, dynamic> params) async {
   try {
@@ -367,6 +512,8 @@ Future<Map<String, dynamic>> processFrameInIsolate(
   }
 }
 
+
+
 /// Упорядочивает 4 точки так, чтобы получилась последовательность:
 /// [верхний левый, верхний правый, нижний правый, нижний левый]
 List<cv.Point2f> orderPoints(List<cv.Point2f> pts) {
@@ -374,7 +521,6 @@ List<cv.Point2f> orderPoints(List<cv.Point2f> pts) {
     throw Exception('Ожидается ровно 4 точки');
   }
 
-  // Инициализируем все четыре переменные первой точкой из списка.
   cv.Point2f tl = pts[0];
   cv.Point2f tr = pts[0];
   cv.Point2f br = pts[0];

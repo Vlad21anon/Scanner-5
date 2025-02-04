@@ -11,6 +11,7 @@ import '../blocs/filter_cubit.dart';
 import '../widgets/custom_circular_button.dart';
 import '../widgets/file_card.dart';
 import '../widgets/filter_popup.dart';
+import 'document_scanner_test.dart';
 
 class FilesPage extends StatefulWidget {
   const FilesPage({super.key});
@@ -98,6 +99,12 @@ class _FilesPageState extends State<FilesPage> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
+                                ElevatedButton(
+                                  onPressed: () {
+                                    navigation.navigateTo(context, DocumentScannerTest());
+                                  },
+                                  child: Text('test scanner'),
+                                ),
                                 Assets.images.imagePhotoroom
                                     .image(width: 261, height: 217),
                                 const SizedBox(height: 8),
