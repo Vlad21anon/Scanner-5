@@ -8,11 +8,22 @@ import '../app/app_shadows.dart';
 import '../app/app_text_style.dart';
 import '../blocs/files_cubit/files_cubit.dart';
 import '../gen/assets.gen.dart';
+import '../services/file_share_service.dart';
 
 class FilePopup extends StatelessWidget {
   final ScanFile file;
 
   const FilePopup({super.key, required this.file});
+
+  /// Функция для создания PDF-файла из аннотированного изображения и его шаринга
+  Future<void> _sharePdfFile() async {
+    try {
+      await FileShareService.shareImageAsPdf(file.path, text: 'Ваш PDF файл');
+
+    } catch (e) {
+      debugPrint("Ошибка при создании или шаринге PDF: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -57,7 +68,7 @@ class FilePopup extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               _buildMenuItem(
-                onTap: () {},
+                onTap: _sharePdfFile,
                 title: 'Share',
                 icon: Assets.images.share.image(
                   width: 14,

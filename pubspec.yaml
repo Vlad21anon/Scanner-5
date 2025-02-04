@@ -50,6 +50,8 @@ dependencies:
   flutter_bloc: ^9.0.0
   equatable: ^2.0.7
   pdf: ^3.11.2
+  purchases_flutter: ^8.4.4
+  shared_preferences: ^2.0.15
 
 dev_dependencies:
   flutter_test:
@@ -68,7 +70,7 @@ dev_dependencies:
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "assets/logo.jpg"
+  image_path: "assets/logo.png"
   min_sdk_android: 21
 
 # For information on the generic Dart part of this file, see the

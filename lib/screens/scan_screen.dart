@@ -69,30 +69,30 @@ class _ScanScreenState extends State<ScanScreen> {
     super.dispose();
   }
 
-  /// Метод для съёмки фото
+  /// Метод для ото
   Future<void> _takePhoto(BuildContext context) async {
-    try {
-      // Ждём инициализации контроллера
-      await _initializeControllerFuture;
-
-      // Делаем снимок и сохраняем во временный файл
-      final xFile = await _cameraController.takePicture();
-      final filePath = xFile.path;
-
-      // Добавляем файл через Cubit
-      context.read<ScanFilesCubit>().addFile(filePath);
-      context.read<FilesCubit>().addFile(filePath);
+    final croppedPath =
+    await scannerKey.currentState?.cropImage();
+    if (croppedPath != null &&
+        croppedPath.isNotEmpty) {
+      // Добавляем файл через Cubit или другой механизм
+      context
+          .read<ScanFilesCubit>()
+          .addFile(croppedPath);
+      context.read<FilesCubit>().addFile(croppedPath);
 
       // Если одиночный режим — сразу уходим на экран сканирования
       if (!isMultiPhoto) {
-        final files = context.read<ScanFilesCubit>().state;
+        // Останавливаем работу сканера, чтобы камера не работала в фоне
+        scannerKey.currentState?.stopScanner();
+
+        final files =
+            context.read<ScanFilesCubit>().state;
         navigation.navigateTo(
           context,
           PdfEditScreen(file: files.last),
         );
       }
-    } catch (e) {
-      debugPrint('Ошибка при съёмке фото: $e');
     }
   }
 
@@ -112,6 +112,9 @@ class _ScanScreenState extends State<ScanScreen> {
 
         // Если одиночный режим — сразу уходим на экран сканирования
         if (!isMultiPhoto) {
+          // Останавливаем работу сканера, чтобы камера не работала в фоне
+          scannerKey.currentState?.stopScanner();
+
           final files = context.read<ScanFilesCubit>().state;
           navigation.navigateTo(
             context,
@@ -214,30 +217,7 @@ class _ScanScreenState extends State<ScanScreen> {
 
                           // Кнопка "сделать снимок"
                           GestureDetector(
-                            onTap: () async {
-                              final croppedPath =
-                                  await scannerKey.currentState?.cropImage();
-                              debugPrint(
-                                  '--------------------------------------------------------------------$croppedPath----------------------------------------------------------------------------');
-                              if (croppedPath != null &&
-                                  croppedPath.isNotEmpty) {
-                                // Добавляем файл через Cubit или другой механизм
-                                context
-                                    .read<ScanFilesCubit>()
-                                    .addFile(croppedPath);
-                                context.read<FilesCubit>().addFile(croppedPath);
-
-                                // Если одиночный режим — сразу уходим на экран сканирования
-                                if (!isMultiPhoto) {
-                                  final files =
-                                      context.read<ScanFilesCubit>().state;
-                                  navigation.navigateTo(
-                                    context,
-                                    PdfEditScreen(file: files.last),
-                                  );
-                                }
-                              }
-                            },
+                            onTap: () => _takePhoto(context),
                             child: Assets.images.shutter.image(
                               width: 72,
                               height: 72,

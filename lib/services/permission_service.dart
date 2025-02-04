@@ -5,19 +5,24 @@ class PermissionService {
   /// Запрашивает разрешения на использование камеры и микрофона.
   /// Возвращает true, если оба разрешения получены, иначе false.
   Future<bool> requestCameraAndMicrophonePermissions() async {
-    // Запрашиваем разрешение на камеру
-    final cameraStatus = await Permission.camera.request();
-    // Запрашиваем разрешение на микрофон
-    final microphoneStatus = await Permission.microphone.request();
+    // Проверяем статус разрешения на камеру
+    final cameraStatus = await Permission.camera.status;
+    // Проверяем статус разрешения на микрофон
+    final microphoneStatus = await Permission.microphone.status;
 
-    // Если оба разрешения предоставлены, возвращаем true
+    // Если оба разрешения уже предоставлены, возвращаем true
     if (cameraStatus.isGranted && microphoneStatus.isGranted) {
       return true;
-    } else {
-      // Если какое-либо разрешение не предоставлено,
-      // можно предложить пользователю открыть настройки приложения
-      await openAppSettings();
-      return false;
     }
+
+    // Запрашиваем недостающие разрешения
+    final statuses = await [
+      if (!cameraStatus.isGranted) Permission.camera,
+      if (!microphoneStatus.isGranted) Permission.microphone,
+    ].request();
+
+    // Проверяем, предоставлены ли теперь оба разрешения
+    return statuses[Permission.camera]?.isGranted == true &&
+        statuses[Permission.microphone]?.isGranted == true;
   }
 }

@@ -11,6 +11,13 @@ class AppTextStyle {
     fontSize: 32,
   );
 
+  static TextStyle exo36 = TextStyle(
+    fontFamily: 'Exo',
+    color: AppColors.white,
+    fontSize: 36,
+    fontWeight: FontWeight.bold,
+  );
+
   static TextStyle exo20 = TextStyle(
     fontFamily: 'Exo',
     color: AppColors.black,

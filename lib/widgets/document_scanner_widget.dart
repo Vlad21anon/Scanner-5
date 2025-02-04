@@ -12,6 +12,8 @@ import 'package:owl_tech_pdf_scaner/widgets/paper_border_painter.dart';
 import 'package:path_provider/path_provider.dart'; // для временной папки
 import 'package:path/path.dart' as path;
 
+import '../screens/loading_screen.dart';
+
 /// Виджет, который реализует сканирование документа с использованием камеры.
 /// После нажатия на кнопку «Сфотографировать» происходит обработка изображения в отдельном изоляте.
 class DocumentScannerWidget extends StatefulWidget {
@@ -21,7 +23,8 @@ class DocumentScannerWidget extends StatefulWidget {
   State<DocumentScannerWidget> createState() => DocumentScannerWidgetState();
 }
 
-class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
+class DocumentScannerWidgetState extends State<DocumentScannerWidget>
+    with WidgetsBindingObserver {
   late CameraController _controller;
   bool _isCameraInitialized = false;
   bool _isProcessing = false;
@@ -32,27 +35,37 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
 
   // Дополнительные параметры для корректировки смещения
   double offsetAdjustmentX = 0;
-  double offsetAdjustmentY = 5;//-115;
+  double offsetAdjustmentY = -120; // можно настроить под ваш дизайн
+
+  int _frameCounter = 0; // Счётчик кадров для обработки каждого N-ого кадра
+  final int _processEveryNthFrame = 2; // например, обрабатывать каждый второй кадр
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initCamera();
   }
 
   Future<void> _initCamera() async {
     final cameras = await availableCameras();
 
+    // Используем разрешение low для снижения нагрузки
     _controller = CameraController(
       cameras[0],
-      ResolutionPreset.medium,
+      ResolutionPreset.low,
       imageFormatGroup: ImageFormatGroup.yuv420,
     );
     await _controller.initialize();
+    if (!mounted) return;
     setState(() {
       _isCameraInitialized = true;
     });
     _controller.startImageStream((CameraImage image) {
+      _frameCounter++;
+      // Обработка только каждого _processEveryNthFrame кадра
+      if (_frameCounter % _processEveryNthFrame != 0) return;
+
       if (!_isProcessing) {
         _isProcessing = true;
         _processCameraImage(image);
@@ -60,16 +73,53 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
     });
   }
 
+  /// Останавливает поток изображений камеры, если он запущен.
+  void stopScanner() {
+    if (_isCameraInitialized && _controller.value.isStreamingImages) {
+      _controller.stopImageStream();
+      debugPrint("Сканер остановлен");
+    }
+  }
+
   @override
   void dispose() {
-    _controller.stopImageStream();
+    WidgetsBinding.instance.removeObserver(this);
+    // Останавливаем поток изображений и освобождаем контроллер
+    // Останавливаем поток изображений и освобождаем контроллер
+    if (_controller.value.isStreamingImages) {
+      _controller.stopImageStream();
+    }
     _controller.dispose();
     super.dispose();
   }
 
+  /// Отслеживаем изменения жизненного цикла приложения
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_isCameraInitialized || !_controller.value.isInitialized) return;
+
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
+      // Останавливаем поток, если приложение не активно
+      _controller.stopImageStream();
+    } else if (state == AppLifecycleState.resumed) {
+      // При возобновлении, если контроллер не работает, запускаем его
+      if (!_controller.value.isStreamingImages) {
+        _controller.startImageStream((CameraImage image) {
+          _frameCounter++;
+          if (_frameCounter % _processEveryNthFrame != 0) return;
+          if (!_isProcessing) {
+            _isProcessing = true;
+            _processCameraImage(image);
+          }
+        });
+      }
+    }
+  }
+
   /// Преобразует CameraImage (YUV420) в PNG-байты с использованием пакета image.
   Uint8List convertYUV420ToPNG(CameraImage image) {
-    // Если изображение имеет только одну плоскость – скорее всего это формат BGRA (например, на iOS)
+    // Реализация (без изменений)
     if (image.planes.length == 1) {
       final plane = image.planes[0];
       final img.Image bgraImage = img.Image.fromBytes(
@@ -79,9 +129,7 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
         order: img.ChannelOrder.bgra,
       );
       return Uint8List.fromList(img.encodePng(bgraImage));
-    }
-    // Если изображение имеет две плоскости – обрабатываем как NV12 (Y + interleaved UV)
-    else if (image.planes.length == 2) {
+    } else if (image.planes.length == 2) {
       final int width = image.width;
       final int height = image.height;
       final img.Image rgbImage = img.Image(width: width, height: height);
@@ -95,31 +143,25 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
           int yp = planeY.bytes[y * planeY.bytesPerRow + x];
           int uvIndex = (y ~/ 2) * uvRowStride + (x ~/ 2) * 2;
           int u, v;
-          // На iOS предполагаем, что порядок плоскости UV равен [V, U]
           if (Platform.isIOS) {
             v = planeUV.bytes[uvIndex];
             u = planeUV.bytes[uvIndex + 1];
           } else {
-            // На остальных платформах порядок [U, V]
             u = planeUV.bytes[uvIndex];
             v = planeUV.bytes[uvIndex + 1];
           }
-
           double yVal = yp.toDouble();
           double uVal = u.toDouble() - 128.0;
           double vVal = v.toDouble() - 128.0;
-
           int r = (yVal + 1.402 * vVal).round().clamp(0, 255);
-          int g = (yVal - 0.344136 * uVal - 0.714136 * vVal).round().clamp(0, 255);
+          int g =
+          (yVal - 0.344136 * uVal - 0.714136 * vVal).round().clamp(0, 255);
           int b = (yVal + 1.772 * uVal).round().clamp(0, 255);
-
           rgbImage.setPixelRgba(x, y, r, g, b, 255);
         }
       }
       return Uint8List.fromList(img.encodePng(rgbImage));
-    }
-    // Если плоскостей 3 – обрабатываем как YUV420
-    else if (image.planes.length >= 3) {
+    } else if (image.planes.length >= 3) {
       final int width = image.width;
       final int height = image.height;
       final img.Image rgbImage = img.Image(width: width, height: height);
@@ -135,36 +177,34 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
         for (int x = 0; x < width; x++) {
           int yp = planeY.bytes[y * planeY.bytesPerRow + x];
           int uvIndex = (y ~/ 2) * uvRowStride + (x ~/ 2) * uvPixelStride;
-
           int up = planeV.bytes[uvIndex];
           int vp = planeU.bytes[uvIndex];
-
           double yVal = yp.toDouble();
           double uVal = up.toDouble() - 128.0;
           double vVal = vp.toDouble() - 128.0;
-
           int r = (yVal + 1.402 * vVal).round().clamp(0, 255);
-          int g = (yVal - 0.344136 * uVal - 0.714136 * vVal).round().clamp(0, 255);
+          int g =
+          (yVal - 0.344136 * uVal - 0.714136 * vVal).round().clamp(0, 255);
           int b = (yVal + 1.772 * uVal).round().clamp(0, 255);
-
           rgbImage.setPixelRgba(x, y, r, g, b, 255);
         }
       }
       return Uint8List.fromList(img.encodePng(rgbImage));
     } else {
-      throw Exception("Неподдерживаемый формат камеры: ожидается 1 (BGRA), 2 (NV12) или 3 (YUV420) плоскости.");
+      throw Exception(
+          "Неподдерживаемый формат камеры: ожидается 1 (BGRA), 2 (NV12) или 3 (YUV420) плоскости.");
     }
   }
 
-  /// Обработка кадра в главном потоке: конвертируем кадр в PNG-байты,
-  /// затем вызываем compute(), который запускает функцию processFrameInIsolate.
   Future<void> _processCameraImage(CameraImage image) async {
     try {
-      _cameraImageSize = Size(image.width.toDouble(), image.height.toDouble());
+      _cameraImageSize =
+          Size(image.width.toDouble(), image.height.toDouble());
       Uint8List pngBytes = convertYUV420ToPNG(image);
       _lastPngBytes = pngBytes;
 
-      debugPrint("Начинаем обработку кадра. Размер изображения: ${image.width}x${image.height}");
+      debugPrint(
+          "Начинаем обработку кадра. Размер изображения: ${image.width}x${image.height}");
 
       final result = await compute(processFrameInIsolate, {
         'pngBytes': pngBytes,
@@ -177,8 +217,9 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
         return;
       }
 
-      List<List<double>> cornersList = result['corners'] as List<List<double>>;
-      Uint8List previewBytes = result['preview'] as Uint8List;
+      List<List<double>> cornersList =
+      result['corners'] as List<List<double>>;
+      // Здесь можно также обновлять preview, если нужно
 
       debugPrint("Получено ${cornersList.length} углов из изолята");
 
@@ -189,8 +230,6 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
         corners.add(Offset(pt[0], pt[1]));
       }
 
-      // Обновляем состояние: preview всегда показывается,
-      // а paperCorners устанавливается только если найдено ровно 4 угла.
       setState(() {
         _paperCorners = corners.length == 4 ? corners : null;
       });
@@ -202,7 +241,6 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
     }
   }
 
-  /// Функция, вызываемая при нажатии на кнопку "Обрезать фото"
   Future<String?> cropImage() async {
     if (_lastPngBytes == null ||
         _paperCorners == null ||
@@ -213,28 +251,22 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
       return null;
     }
 
-    // Передаём в изоляте: PNG-байты, контур, размеры исходного кадра.
     final croppedBytes = await compute(cropFrameInIsolate, {
       'pngBytes': _lastPngBytes,
-      // Передаём контур как List<List<double>>
       'corners': _paperCorners!.map((pt) => [pt.dx, pt.dy]).toList(),
       'width': _cameraImageSize!.width.toInt(),
       'height': _cameraImageSize!.height.toInt(),
     });
 
     if (croppedBytes.isNotEmpty) {
-      // Сохраняем обрезанное изображение в файловую систему
       try {
-        // Получаем директорию для документов
         final Directory appDocDir = await getApplicationDocumentsDirectory();
-        // Формируем уникальное имя файла, например, с использованием текущего времени
         final String fileName =
             "cropped_${DateTime.now().millisecondsSinceEpoch}.png";
         final String filePath = path.join(appDocDir.path, fileName);
         final File file = File(filePath);
         await file.writeAsBytes(croppedBytes);
 
-        // Обновляем состояние: сохраняем байты и путь к файлу
         if (mounted) {
           setState(() {
             _croppedImagePath = filePath;
@@ -245,7 +277,7 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
       } catch (e) {
         debugPrint("Ошибка при сохранении файла: $e");
       }
-    } else {}
+    }
     return null;
   }
 
@@ -254,17 +286,17 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
     return Scaffold(
       backgroundColor: AppColors.black,
       body: _isCameraInitialized
-          ? Center(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return Stack(
-              alignment: Alignment.center,
+          ? LayoutBuilder(
+        builder: (context, constraints) {
+          return Padding(
+            padding: const EdgeInsets.only(top: 60),
+            child: Stack(
+              alignment: Alignment.topCenter,
               children: [
                 CameraPreview(_controller),
                 if (_paperCorners != null && _cameraImageSize != null)
                   CustomPaint(
-                    size:
-                    Size(constraints.maxWidth, constraints.maxHeight),
+                    size: Size(constraints.maxWidth, constraints.maxHeight),
                     painter: PaperBorderPainter(
                       corners: _paperCorners!,
                       cameraImageSize: _cameraImageSize!,
@@ -274,11 +306,11 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget> {
                     ),
                   ),
               ],
-            );
-          },
-        ),
+            ),
+          );
+        },
       )
-          : const Center(child: CircularProgressIndicator()),
+          : LoadingScreen(),
     );
   }
 }
@@ -320,7 +352,8 @@ Future<Map<String, dynamic>> processFrameInIsolate(
       previewPng = previewResult.$2;
     }
 
-    var contoursTuple = cv.findContours(edges, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+    var contoursTuple =
+        cv.findContours(edges, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
     var contours = contoursTuple.$1;
 
     dynamic paperContour;
@@ -416,15 +449,18 @@ Future<Uint8List> cropFrameInIsolate(Map<String, dynamic> params) async {
   try {
     // Исходные данные
     Uint8List pngBytes = params['pngBytes'];
-    List<dynamic> cornersDynamic = params['corners']; // Ожидается список вида [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
+    List<dynamic> cornersDynamic = params[
+        'corners']; // Ожидается список вида [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
 
     // Декодируем исходное изображение в cv.Mat в цветном режиме
     cv.Mat mat = cv.imdecode(pngBytes, cv.IMREAD_COLOR);
-    debugPrint("Исходное изображение: ширина = ${mat.width}, высота = ${mat.height}, channels = ${mat.channels}");
+    debugPrint(
+        "Исходное изображение: ширина = ${mat.width}, высота = ${mat.height}, channels = ${mat.channels}");
 
     // Преобразуем список углов в список Point2f
     List<cv.Point2f> srcPoints = cornersDynamic
-        .map<cv.Point2f>((item) => cv.Point2f(item[0].toDouble(), item[1].toDouble()))
+        .map<cv.Point2f>(
+            (item) => cv.Point2f(item[0].toDouble(), item[1].toDouble()))
         .toList();
     if (srcPoints.length != 4) {
       throw Exception('Ожидается ровно 4 точки для обрезки');
@@ -432,23 +468,29 @@ Future<Uint8List> cropFrameInIsolate(Map<String, dynamic> params) async {
 
     // Упорядочиваем точки в порядке: верхний левый, верхний правый, нижний правый, нижний левый
     List<cv.Point2f> orderedPoints = orderPoints(srcPoints);
-    debugPrint("Упорядоченные точки: ${orderedPoints.map((pt) => "(${pt.x}, ${pt.y})").join(', ')}");
+    debugPrint(
+        "Упорядоченные точки: ${orderedPoints.map((pt) => "(${pt.x}, ${pt.y})").join(', ')}");
 
     // Вычисляем ширину итогового изображения как максимум из расстояний между верхними и нижними сторонами:
-    double widthTop = math.sqrt(math.pow(orderedPoints[1].x - orderedPoints[0].x, 2) +
-        math.pow(orderedPoints[1].y - orderedPoints[0].y, 2));
-    double widthBottom = math.sqrt(math.pow(orderedPoints[2].x - orderedPoints[3].x, 2) +
-        math.pow(orderedPoints[2].y - orderedPoints[3].y, 2));
+    double widthTop = math.sqrt(
+        math.pow(orderedPoints[1].x - orderedPoints[0].x, 2) +
+            math.pow(orderedPoints[1].y - orderedPoints[0].y, 2));
+    double widthBottom = math.sqrt(
+        math.pow(orderedPoints[2].x - orderedPoints[3].x, 2) +
+            math.pow(orderedPoints[2].y - orderedPoints[3].y, 2));
     double maxWidth = math.max(widthTop, widthBottom);
 
     // Вычисляем высоту итогового изображения как максимум из расстояний между левыми и правыми сторонами:
-    double heightLeft = math.sqrt(math.pow(orderedPoints[3].x - orderedPoints[0].x, 2) +
-        math.pow(orderedPoints[3].y - orderedPoints[0].y, 2));
-    double heightRight = math.sqrt(math.pow(orderedPoints[2].x - orderedPoints[1].x, 2) +
-        math.pow(orderedPoints[2].y - orderedPoints[1].y, 2));
+    double heightLeft = math.sqrt(
+        math.pow(orderedPoints[3].x - orderedPoints[0].x, 2) +
+            math.pow(orderedPoints[3].y - orderedPoints[0].y, 2));
+    double heightRight = math.sqrt(
+        math.pow(orderedPoints[2].x - orderedPoints[1].x, 2) +
+            math.pow(orderedPoints[2].y - orderedPoints[1].y, 2));
     double maxHeight = math.max(heightLeft, heightRight);
 
-    debugPrint("Вычисленные размеры итогового изображения: maxWidth = $maxWidth, maxHeight = $maxHeight");
+    debugPrint(
+        "Вычисленные размеры итогового изображения: maxWidth = $maxWidth, maxHeight = $maxHeight");
 
     // Определяем целевые точки для перспективного преобразования
     List<cv.Point2f> dstPoints = [
@@ -470,7 +512,8 @@ Future<Uint8List> cropFrameInIsolate(Map<String, dynamic> params) async {
       perspectiveMatrix,
       (maxWidth.toInt(), maxHeight.toInt()),
     );
-    debugPrint("Изображение после warpPerspective: ширина = ${warped.width}, высота = ${warped.height}, channels = ${warped.channels}");
+    debugPrint(
+        "Изображение после warpPerspective: ширина = ${warped.width}, высота = ${warped.height}, channels = ${warped.channels}");
 
     // Преобразуем цветовое пространство из BGR (стандарт OpenCV) в RGB
     cv.Mat rgbMat = cv.cvtColor(warped, cv.COLOR_BGR2RGB);
@@ -481,7 +524,8 @@ Future<Uint8List> cropFrameInIsolate(Map<String, dynamic> params) async {
     cv.Mat finalMat;
     if (!Platform.isIOS) {
       finalMat = cv.rotate(rgbMat, cv.ROTATE_90_CLOCKWISE);
-      debugPrint("Изображение повернуто: ширина = ${finalMat.width}, высота = ${finalMat.height}");
+      debugPrint(
+          "Изображение повернуто: ширина = ${finalMat.width}, высота = ${finalMat.height}");
       rgbMat.dispose();
     } else {
       finalMat = rgbMat;
@@ -493,7 +537,8 @@ Future<Uint8List> cropFrameInIsolate(Map<String, dynamic> params) async {
       throw Exception("Ошибка при кодировании изображения в PNG");
     }
     Uint8List croppedPng = result.$2;
-    debugPrint("Размер обрезанного изображения (PNG): ${croppedPng.lengthInBytes} байт");
+    debugPrint(
+        "Размер обрезанного изображения (PNG): ${croppedPng.lengthInBytes} байт");
 
     // Освобождаем ресурсы
     mat.dispose();

@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import '../app/app_colors.dart';
 import '../app/app_text_style.dart';
 import '../gen/assets.gen.dart';
+import '../services/file_share_service.dart';
 import '../services/navigation_service.dart';
 import '../widgets/crop_widget.dart';
 import '../widgets/custom_circular_button.dart';
@@ -110,43 +111,7 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
   /// Функция для создания PDF-файла из аннотированного изображения и его шаринга
   Future<void> _sharePdfFile() async {
     try {
-      // Создаём PDF документ
-      final pdf = pw.Document();
-
-      // Получаем путь к изображению из файла
-      // Предполагается, что ScanFile содержит путь к изображению в свойстве path
-      final imageFile = File(widget.file.path);
-      if (!await imageFile.exists()) {
-        debugPrint("Файл не найден: ${widget.file.path}");
-        return;
-      }
-
-      // Читаем байты изображения
-      final imageBytes = await imageFile.readAsBytes();
-
-      // Загружаем изображение в PDF формате
-      final pdfImage = pw.MemoryImage(imageBytes);
-
-      // Добавляем страницу с изображением в PDF-документ
-      pdf.addPage(
-        pw.Page(
-          pageFormat: PdfPageFormat.a4,
-          build: (pw.Context context) {
-            return pw.Center(
-              child: pw.Image(pdfImage, fit: pw.BoxFit.contain),
-            );
-          },
-        ),
-      );
-
-      // Сохраняем PDF во временный файл
-      final tempDir = await getTemporaryDirectory();
-      final pdfPath = '${tempDir.path}/shared_file.pdf';
-      final pdfFile = File(pdfPath);
-      await pdfFile.writeAsBytes(await pdf.save());
-
-      // Шарим PDF-файл через share_plus
-      await Share.shareXFiles([XFile(pdfPath)], text: 'Вот ваш PDF файл');
+      await FileShareService.shareImageAsPdf(widget.file.path, text: 'Ваш PDF файл');
 
     } catch (e) {
       debugPrint("Ошибка при создании или шаринге PDF: $e");
