@@ -247,7 +247,7 @@ Future<List<List<double>>> processFrameInIsolate(
 
     cv.Mat gray = await cv.cvtColorAsync(mat, cv.COLOR_BGR2GRAY);
     cv.Mat blur = await cv.gaussianBlurAsync(gray, (5, 5), 0);
-    cv.Mat edges = await cv.cannyAsync(blur, 50, 300, apertureSize: 3);
+    cv.Mat edges = await cv.cannyAsync(blur, 50, 150, apertureSize: 3);
 
     var contoursTuple =
         cv.findContours(edges, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
