@@ -53,7 +53,7 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
     // Используем разрешение low для снижения нагрузки
     _controller = CameraController(
       cameras[0],
-      ResolutionPreset.low,
+      ResolutionPreset.medium,
       imageFormatGroup: ImageFormatGroup.yuv420,
     );
     await _controller.initialize();

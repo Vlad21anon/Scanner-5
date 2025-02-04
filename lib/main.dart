@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
 import 'package:owl_tech_pdf_scaner/blocs/files_cubit/files_cubit.dart';
@@ -31,7 +33,15 @@ void main() async {
   // Инициализируем RevenueCat через новый метод configure()
   await RevenueCatService().init();
 
-  runApp(MyApp());
+  // убираем повороты
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]).then((_) {
+    runApp(
+      MyApp(),
+    );
+  });
 }
 
 class MyApp extends StatelessWidget {
@@ -54,11 +64,19 @@ class MyApp extends StatelessWidget {
           create: (context) => TextEditCubit(),
         ),
       ],
-      child: MaterialApp(
-        navigatorKey: NavigationService().navigatorKey,
-        title: 'PDF Scanner',
-        debugShowCheckedModeBanner: false,
-        home: const LaunchDecider(),
+      child: ScreenUtilInit(
+        designSize: const Size(393, 852),
+        minTextAdapt: true,
+        splitScreenMode: true,
+        builder: (_, child) {
+          return MaterialApp(
+            navigatorKey: NavigationService().navigatorKey,
+            title: 'PDF Scanner',
+            debugShowCheckedModeBanner: false,
+            home: child,
+          );
+        },
+        child: const LaunchDecider(),
       ),
     );
   }

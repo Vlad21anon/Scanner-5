@@ -8,12 +8,10 @@ import 'package:owl_tech_pdf_scaner/gen/assets.gen.dart';
 import 'package:owl_tech_pdf_scaner/models/draw_point.dart';
 import 'package:owl_tech_pdf_scaner/models/note_data.dart';
 import 'package:owl_tech_pdf_scaner/models/scan_file.dart';
-import 'package:owl_tech_pdf_scaner/widgets/crop_widget.dart';
 import 'package:owl_tech_pdf_scaner/widgets/custom_circular_button.dart';
 import 'package:owl_tech_pdf_scaner/widgets/handwriting_painter.dart';
 import 'package:owl_tech_pdf_scaner/widgets/%D1%81ustom_slider.dart';
 import 'package:owl_tech_pdf_scaner/widgets/resizable_note.dart';
-import 'editable_movable_text.dart';
 
 class PenEditWidget extends StatefulWidget {
   final ScanFile file;

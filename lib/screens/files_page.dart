@@ -5,6 +5,7 @@ import 'package:owl_tech_pdf_scaner/gen/assets.gen.dart';
 import 'package:owl_tech_pdf_scaner/models/scan_file.dart';
 import 'package:owl_tech_pdf_scaner/screens/onboarding_screen.dart';
 import 'package:owl_tech_pdf_scaner/screens/pdf_edit_screen.dart';
+import 'package:owl_tech_pdf_scaner/screens/subscription_selection_screen.dart';
 import 'package:owl_tech_pdf_scaner/services/navigation_service.dart';
 
 import '../blocs/files_cubit/files_cubit.dart';
@@ -100,18 +101,18 @@ class _FilesPageState extends State<FilesPage> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                // ElevatedButton(
-                                //   onPressed: () {
-                                //     navigation.navigateTo(context, DocumentScannerTest());
-                                //   },
-                                //   child: Text('DocumentScannerTest'),
-                                // ),
-                                // ElevatedButton(
-                                //   onPressed: () {
-                                //     navigation.navigateTo(context, OnboardingScreen());
-                                //   },
-                                //   child: Text('OnboardingScreen'),
-                                // ),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    navigation.navigateTo(context, DocumentScannerTest());
+                                  },
+                                  child: Text('DocumentScannerTest'),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    navigation.navigateTo(context, OnboardingScreen());
+                                  },
+                                  child: Text('OnboardingScreen'),
+                                ),
                                 Assets.images.imagePhotoroom2
                                     .image(width: 261, height: 217),
                                 const SizedBox(height: 8),
