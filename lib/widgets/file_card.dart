@@ -1,12 +1,12 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 
-import '../app/app_colors.dart';
+import '../app/app_icons.dart';
 import '../app/app_shadows.dart';
 import '../app/app_text_style.dart';
-import '../gen/assets.gen.dart';
 import '../models/scan_file.dart';
 import 'file_popup.dart';
 
@@ -31,53 +31,42 @@ class FileCard extends StatelessWidget {
       onLongPress: onLongPress,
       child: SizedBox(
         width: double.infinity,
-        height: 90,
+        height: 90.h,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             SizedBox(
-              width: 64,
-              height: 87,
+              width: 64.w,
+              height: 87.h,
               child: Stack(
                 children: [
                   Container(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(8.r),
                       boxShadow: [
                         AppShadows.grey03b3r1o00,
                       ],
                     ),
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(8.r),
                       child: Image.file(
                         File(file.path),
                         fit: BoxFit.fill,
-                        width: 64,
-                        height: 87,
+                        width: 64.w,
+                        height: 87.h,
                       ),
                     ),
                   ),
                   Positioned(
-                    top: 5,
-                    right: 5,
-                    child: Container(
-                      width: 19,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: AppColors.white,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      padding: EdgeInsets.all(3),
-                      child: Assets.images.pdfIcon.image(
-                        fit: BoxFit.cover,
-                      ),
-                    ),
+                    top: 5.h,
+                    right: 5.w,
+                    child: AppIcons.pdfIcon29x30,
                   ),
                 ],
               ),
             ),
-            SizedBox(width: 26),
+            SizedBox(width: 26.w),
             Expanded(
                 child: Container(
               color: Colors.transparent,
@@ -90,7 +79,7 @@ class FileCard extends StatelessWidget {
                     style: AppTextStyle.exo20,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  SizedBox(height: 12),
+                  SizedBox(height: 12.h),
                   Text(
                     '${DateFormat('dd MMM yyyy').format(file.created)} ${file.size.toStringAsFixed(1)}MB',
                     style: AppTextStyle.exo16,
@@ -99,7 +88,7 @@ class FileCard extends StatelessWidget {
                 ],
               ),
             )),
-            SizedBox(width: 26),
+            SizedBox(width: 26.w),
             GestureDetector(
               onTap: () {
                 final RenderBox button =
@@ -113,7 +102,7 @@ class FileCard extends StatelessWidget {
                     children: [
                       Positioned(
                         right: position.dx,
-                        top: position.dy + position.dx + 16,
+                        top: position.dy + position.dx + 16.h,
                         child: Material(
                           color: Colors.transparent,
                           child: FilePopup(file: file),
@@ -123,31 +112,38 @@ class FileCard extends StatelessWidget {
                   ),
                 );
               },
-              child: SizedBox(
-                height: 54,
-                width: 54,
-                child: Assets.images.menu.image(width: 3, height: 24),
+              child: Container(
+                height: 54.w,
+                width: 54.w,
+                color: Colors.transparent,
+                child: Center(
+                  child: FittedBox(
+                    child: AppIcons.menu3x24,
+                  ),
+                ),
               ),
             ),
-            SizedBox(width: 8),
+            SizedBox(width: 8.w),
             if (isSelectedMode)
               file.isSelected
-                  ? SizedBox(
-                      height: 40,
-                      width: 40,
-                      child: Assets.images.circleBlue.image(
-                        width: 24,
-                        height: 24,
-                        //fit: BoxFit.fill,
+                  ? Container(
+                      height: 40.h,
+                      width: 40.w,
+                      color: Colors.transparent,
+                      child: Center(
+                        child: FittedBox(
+                          child: AppIcons.circleBlue24x24,
+                        ),
                       ),
                     )
-                  : SizedBox(
-                      width: 40,
-                      height: 40,
-                      child: Assets.images.circleBorderless.image(
-                        width: 24,
-                        height: 24,
-                        //fit: BoxFit.cover,
+                  : Container(
+                      width: 40.w,
+                      height: 40.h,
+                      color: Colors.transparent,
+                      child: Center(
+                        child: FittedBox(
+                          child: AppIcons.circleBorderlessGreyIcon24x24,
+                        ),
                       ),
                     ),
           ],

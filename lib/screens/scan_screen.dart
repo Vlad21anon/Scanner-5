@@ -3,7 +3,9 @@ import 'package:camera/camera.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
+import 'package:owl_tech_pdf_scaner/app/app_icons.dart';
 import 'package:owl_tech_pdf_scaner/app/app_text_style.dart';
 import 'package:owl_tech_pdf_scaner/blocs/files_cubit/files_cubit.dart';
 import 'package:owl_tech_pdf_scaner/blocs/scan_files_cubit/scan_files_cubit.dart';
@@ -148,8 +150,8 @@ class _ScanScreenState extends State<ScanScreen> {
             bottom: 0,
             child: Container(
               width: MediaQuery.of(context).size.width,
-              height: 203,
-              padding: const EdgeInsets.all(16),
+              height: 203.h,
+              padding: EdgeInsets.all(16.r),
               decoration: BoxDecoration(
                 color: AppColors.black.withValues(alpha: 0.5),
               ),
@@ -161,7 +163,7 @@ class _ScanScreenState extends State<ScanScreen> {
                       isMultiPhoto = isMulti;
                     },
                   ),
-                  const SizedBox(height: 10),
+                   SizedBox(height: 10.h),
 
                   // Отображение миниатюры последних файлов и кнопок
                   BlocBuilder<ScanFilesCubit, List<ScanFile>>(
@@ -183,21 +185,21 @@ class _ScanScreenState extends State<ScanScreen> {
                                     clipBehavior: Clip.none,
                                     children: [
                                       ClipRRect(
-                                        borderRadius: const BorderRadius.all(
-                                            Radius.circular(3)),
+                                        borderRadius:  BorderRadius.all(
+                                            Radius.circular(3.r)),
                                         child: Image.file(
                                           File(files.last.path),
-                                          width: 60,
-                                          height: 60,
+                                          width: 60.w,
+                                          height: 60.w,
                                           fit: BoxFit.cover,
                                         ),
                                       ),
                                       Positioned(
-                                        top: -13,
-                                        right: -13,
+                                        top: -13.h,
+                                        right: -13.w,
                                         child: Container(
-                                          width: 26,
-                                          height: 26,
+                                          width: 26.w,
+                                          height: 26.w,
                                           decoration: BoxDecoration(
                                             shape: BoxShape.circle,
                                             color: AppColors.white,
@@ -207,7 +209,7 @@ class _ScanScreenState extends State<ScanScreen> {
                                               files.length.toString(),
                                               style: AppTextStyle.nunito32
                                                   .copyWith(
-                                                fontSize: 14,
+                                                fontSize: 14.sp,
                                               ),
                                             ),
                                           ),
@@ -216,14 +218,14 @@ class _ScanScreenState extends State<ScanScreen> {
                                     ],
                                   ),
                                 )
-                              : const SizedBox(width: 60),
+                              :  SizedBox(width: 60.w),
 
                           // Кнопка "сделать снимок"
                           GestureDetector(
                             onTap: () => _takePhoto(context),
                             child: Assets.images.shutter.image(
-                              width: 72,
-                              height: 72,
+                              width: 72.w,
+                              height: 72.w,
                               fit: BoxFit.cover,
                             ),
                           ),
@@ -231,11 +233,7 @@ class _ScanScreenState extends State<ScanScreen> {
                           // Кнопка "добавить файл"
                           CustomCircularButton(
                             onTap: () => _pickFile(context),
-                            child: Assets.images.addFiles.image(
-                              width: 19,
-                              height: 22,
-                              color: AppColors.blue,
-                            ),
+                            child: AppIcons.addFiles19x22,
                           ),
                         ],
                       );
@@ -248,15 +246,15 @@ class _ScanScreenState extends State<ScanScreen> {
 
           // Кнопка "назад" (вверху слева)
           Positioned(
-            top: 75,
-            left: 16,
+            top: 75.h,
+            left: 16.w,
             child: CustomCircularButton(
               withShadow: false,
               color: AppColors.black.withValues(alpha: 0.6),
               onTap: () {
                 navigation.pop(context);
               },
-              child: Assets.images.arrowLeft.image(width: 24, height: 24),
+              child: AppIcons.arrowLeftWhite14x14,
             ),
           ),
         ],

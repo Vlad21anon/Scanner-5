@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:owl_tech_pdf_scaner/app/app_icons.dart';
 
 import '../app/app_colors.dart';
 import '../app/app_shadows.dart';
@@ -40,49 +43,49 @@ class _ToggleMenuState extends State<ToggleMenu> {
     return Row(
       children: [
         Container(
-          height: 66,
-          width: 289,
+          height: 66.h,
+          width: 289.w,
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(100),
+            borderRadius: BorderRadius.circular(100.r),
             boxShadow: [
               AppShadows.grey03b3r1o00,
             ],
           ),
-          padding: const EdgeInsets.all(6),
+          padding: EdgeInsets.all(6.w),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               _buildSlot(
                 index: 0,
                 label: 'Crop',
-                icon: Assets.images.size,
-                iconWidth: 24,
-                iconHeight: 20,
+                icon: Assets.icons.size,
+                iconWidth: 24.w,
+                iconHeight: 20.h,
               ),
               _buildSlot(
                 index: 1,
                 label: 'Text',
-                icon: Assets.images.text,
-                iconWidth: 27,
-                iconHeight: 20,
+                icon: Assets.icons.text,
+                iconWidth: 27.w,
+                iconHeight: 20.h,
               ),
               _buildSlot(
                 index: 2,
                 label: 'Pen',
-                icon: Assets.images.pen,
-                iconWidth: 24,
-                iconHeight: 22,
+                icon: Assets.icons.pen,
+                iconWidth: 24.w,
+                iconHeight: 22.h,
               ),
             ],
           ),
         ),
-        const SizedBox(width: 6),
+        SizedBox(width: 6.w),
         GestureDetector(
           onTap: _onSelectPressed,
           child: Container(
-            height: 66,
-            width: 66,
+            height: 66.w,
+            width: 66.w,
             decoration: BoxDecoration(
               color: Colors.white,
               shape: BoxShape.circle,
@@ -90,7 +93,11 @@ class _ToggleMenuState extends State<ToggleMenu> {
                 AppShadows.grey03b3r1o00,
               ],
             ),
-            child: Assets.images.select.image(width: 26, height: 18),
+            child: Center(
+              child: FittedBox(
+                child: AppIcons.select26x18,
+              ),
+            ),
           ),
         ),
       ],
@@ -103,7 +110,7 @@ class _ToggleMenuState extends State<ToggleMenu> {
   Widget _buildSlot({
     required int index,
     required String label,
-    required AssetGenImage icon,
+    required String icon,
     required double iconWidth,
     required double iconHeight,
   }) {
@@ -120,36 +127,39 @@ class _ToggleMenuState extends State<ToggleMenu> {
         duration: const Duration(milliseconds: 300),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.blue : Colors.transparent,
-          borderRadius: BorderRadius.circular(100),
+          borderRadius: BorderRadius.circular(100.r),
         ),
         padding: isSelected
-            ? const EdgeInsets.symmetric(horizontal: 22, vertical: 16)
+            ? EdgeInsets.symmetric(horizontal: 22.w, vertical: 16.h)
             : EdgeInsets.zero,
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (isSelected)
-              icon.image(
-                width: iconWidth - 5,
-                height: iconHeight - 5,
+              SvgPicture.asset(
+                icon,
+                width: iconWidth - 5.w,
+                height: iconHeight - 5.w,
                 color: AppColors.white,
               ),
             if (!isSelected)
               SizedBox(
                 width: 59,
                 height: 52,
-                child: icon.image(
+                child: SvgPicture.asset(
+                  icon,
+                  fit: BoxFit.none,
                   width: iconWidth,
                   height: iconHeight,
                   color: AppColors.greyIcon,
                 ),
               ),
             if (isSelected) ...[
-              const SizedBox(width: 3),
+              SizedBox(width: 3.w),
               Text(
                 label,
                 style: AppTextStyle.nunito32.copyWith(
-                  fontSize: 16,
+                  fontSize: 16.sp,
                   color: AppColors.white,
                 ),
               ),

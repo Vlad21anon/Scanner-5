@@ -1,11 +1,7 @@
-// PdfEditScreen.dart
-import 'dart:io';
-
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:owl_tech_pdf_scaner/app/app_icons.dart';
 import 'package:owl_tech_pdf_scaner/models/scan_file.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:pdf/pdf.dart';
-import 'package:share_plus/share_plus.dart';
 import '../app/app_colors.dart';
 import '../app/app_text_style.dart';
 import '../gen/assets.gen.dart';
@@ -16,7 +12,6 @@ import '../widgets/custom_circular_button.dart';
 import '../widgets/pen_edit_widget.dart';
 import '../widgets/text_edit_widget.dart';
 import '../widgets/toggle_menu.dart';
-import 'package:pdf/widgets.dart' as pw;
 
 class PdfEditScreen extends StatefulWidget {
   final ScanFile file;
@@ -175,10 +170,10 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
         children: [
           Column(
             children: [
-              const SizedBox(height: 60),
-              const SizedBox(height: 16),
+              SizedBox(height: 60.h),
+              SizedBox(height: 16.h),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: EdgeInsets.symmetric(horizontal: 16.h),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -186,11 +181,7 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
                       onTap: () {
                         navigation.pop(context);
                       },
-                      child: Assets.images.arrowLeft.image(
-                        width: 22,
-                        height: 18,
-                        color: AppColors.black,
-                      ),
+                      child: AppIcons.arrowLeftBlack22x18,
                     ),
                     Text('Crop', style: AppTextStyle.nunito32),
                     CustomCircularButton(
@@ -200,11 +191,7 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
                           return; // Не обновляем состояние, остаёмся в предыдущем режиме
                         }
                       },
-                      child: Assets.images.share.image(
-                        width: 19,
-                        height: 22,
-                        color: AppColors.black,
-                      ),
+                      child:AppIcons.share19x22,
                     ),
                   ],
                 ),
@@ -218,7 +205,7 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
             ],
           ),
           Positioned(
-            bottom: 12,
+            bottom: 12.h,
             child: ToggleMenu(
               onIndexChanged: _onIndexChanged,
             ),

@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/rendering.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 enum HandleType { corner, horizontal, vertical }
 
@@ -28,7 +29,7 @@ class EditableMovableResizableText extends StatefulWidget {
   final double fontSize;
 
   const EditableMovableResizableText({
-    Key? key,
+    super.key,
     required this.initialPosition,
     required this.initialText,
     required this.onPositionChanged,
@@ -36,7 +37,7 @@ class EditableMovableResizableText extends StatefulWidget {
     required this.isEditMode,
     this.textColor = Colors.black,
     this.fontSize = 16.0,
-  }) : super(key: key);
+  });
 
   @override
   State<EditableMovableResizableText> createState() =>
@@ -50,23 +51,23 @@ class EditableMovableResizableTextState
   late Offset _position;
   late String _text;
   bool _isEditing = false;
-  double _width = 200;
-  double _height = 100;
+  double _width = 200.w;
+  double _height = 100.h;
   late double _fontSize;
 
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
 
   // Минимальные размеры контейнера
-  static const double minWidth = 50;
-  static const double minHeight = 30;
+  static final double minWidth = 50.w;
+  static final double minHeight = 30.h;
 
   // Константы для отрисовки ручек
-  static const double cornerSize = 11;
-  static const Size horizontalSize = Size(17, 6);
-  static const Size verticalSize = Size(6, 17);
-  static const double hitSize = 40.0;
-  static const double hitOffset = hitSize / 2;
+  static final double cornerSize = 11.w;
+  static final Size horizontalSize = Size(17.w, 6.h);
+  static final Size verticalSize = Size(6.w, 17.h);
+  static final double hitSize = 40.w;
+  static final double hitOffset = hitSize / 2;
 
   final _deferredPointerLink = DeferredPointerHandlerLink();
 
@@ -165,7 +166,7 @@ class EditableMovableResizableTextState
                   link: _deferredPointerLink,
                   child: Container(
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.blue, width: 1),
+                      border: Border.all(color: Colors.blue, width: 1.w),
                     ),
                     child: Stack(
                       clipBehavior: Clip.none,
@@ -173,7 +174,7 @@ class EditableMovableResizableTextState
                         // Основной контент: текст или TextField для редактирования
                         Positioned.fill(
                           child: Container(
-                            padding: const EdgeInsets.all(6),
+                            padding: EdgeInsets.all(6.r),
                             alignment: Alignment.center,
                             child: _isEditing
                                 ? TextField(
@@ -274,7 +275,7 @@ class EditableMovableResizableTextState
     BoxDecoration decoration;
     switch (type) {
       case HandleType.corner:
-        visualSize = const Size(cornerSize, cornerSize);
+        visualSize = Size(cornerSize, cornerSize);
         decoration = BoxDecoration(
           color: Colors.white,
           border: Border.all(color: Colors.blue),
@@ -286,7 +287,7 @@ class EditableMovableResizableTextState
         decoration = BoxDecoration(
           color: Colors.white,
           border: Border.all(color: Colors.blue),
-          borderRadius: BorderRadius.circular(11),
+          borderRadius: BorderRadius.circular(11.r),
         );
         break;
       case HandleType.vertical:
@@ -294,7 +295,7 @@ class EditableMovableResizableTextState
         decoration = BoxDecoration(
           color: Colors.white,
           border: Border.all(color: Colors.blue),
-          borderRadius: BorderRadius.circular(11),
+          borderRadius: BorderRadius.circular(11.r),
         );
         break;
     }

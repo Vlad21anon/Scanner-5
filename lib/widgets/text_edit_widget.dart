@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
 import 'package:owl_tech_pdf_scaner/app/app_text_style.dart';
 import 'package:owl_tech_pdf_scaner/widgets/%D1%81ustom_slider.dart';
@@ -17,10 +18,10 @@ class TextEditWidget extends StatefulWidget {
 }
 
 class TextEditWidgetState extends State<TextEditWidget> {
-  String _text = 'Tap to edit';
+  String _text = '';
   Color _textColor = Colors.black;
-  double _fontSize = 16.0;
-  Offset _textOffset = const Offset(100, 100);
+  double _fontSize = 16.sp;
+  Offset _textOffset =  Offset(100.w, 100.h);
   bool isEditMode = false;
   LocalKey imageKey = UniqueKey();
   final GlobalKey<EditableMovableResizableTextState> textEditKey = GlobalKey();
@@ -38,6 +39,7 @@ class TextEditWidgetState extends State<TextEditWidget> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: AppColors.background,
       body: SizedBox.expand(
         child: Stack(
@@ -45,16 +47,16 @@ class TextEditWidgetState extends State<TextEditWidget> {
             Align(
               alignment: Alignment.topCenter,
               child: Padding(
-                padding: const EdgeInsets.only(top: 24),
+                padding:  EdgeInsets.only(top: 24.h),
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    const double containerWidth = 361;
-                    const double containerHeight = 491;
+                    final double containerWidth = 361.w;
+                    final double containerHeight = 491.h;
                     return SizedBox(
                       width: containerWidth,
                       height: containerHeight,
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(12.r),
                         child: Image.file(
                           File(widget.file.path),
                           key: imageKey,
@@ -67,32 +69,32 @@ class TextEditWidgetState extends State<TextEditWidget> {
               ),
             ),
             DraggableScrollableSheet(
-              initialChildSize: isEditMode ? 0.6 : 0.45,
-              minChildSize: isEditMode ? 0.6 : 0.2,
-              maxChildSize: isEditMode ? 0.6 : 0.45,
+              initialChildSize: isEditMode ? 0.8.h : 0.45.h,
+              minChildSize: isEditMode ? 0.8.h : 0.1.h,
+              maxChildSize: isEditMode ? 0.8.h : 0.45.h,
               builder: (context, scrollController) {
                 return Container(
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(30.r)),
                   ),
                   child: ListView(
                     controller: scrollController,
-                    padding: const EdgeInsets.all(16),
+                    padding:  EdgeInsets.all(16.r),
                     children: [
                       Center(
                         child: Container(
-                          width: 110,
-                          height: 4,
+                          width: 110.w,
+                          height: 4.h,
                           decoration: BoxDecoration(
                             color: AppColors.black,
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(8.r),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 8),
+                       SizedBox(height: 8.h),
                       Text('Font Size', style: AppTextStyle.exo20),
-                      const SizedBox(height: 16),
+                       SizedBox(height: 16.h),
                       Row(
                         children: [
                           Text('Small', style: AppTextStyle.exo16),
@@ -110,9 +112,9 @@ class TextEditWidgetState extends State<TextEditWidget> {
                           Text('Large', style: AppTextStyle.exo16),
                         ],
                       ),
-                      const SizedBox(height: 24),
+                       SizedBox(height: 24.h),
                       Text('Color', style: AppTextStyle.exo20),
-                      const SizedBox(height: 16),
+                       SizedBox(height: 16.h),
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
@@ -131,7 +133,7 @@ class TextEditWidgetState extends State<TextEditWidget> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 16),
+                       SizedBox(height: 16.h),
                     ],
                   ),
                 );
@@ -176,15 +178,15 @@ class TextEditWidgetState extends State<TextEditWidget> {
         });
       },
       child: Container(
-        margin: const EdgeInsets.only(right: 8),
-        width: 30,
-        height: 30,
+        margin: EdgeInsets.only(right: 8.r),
+        width: 30.w,
+        height: 30.h,
         decoration: BoxDecoration(
           color: color,
           shape: BoxShape.circle,
           border: isSelected
-              ? Border.all(color: AppColors.black, width: 3)
-              : (showBorder ? Border.all(color: AppColors.greyIcon, width: 2) : null),
+              ? Border.all(color: AppColors.black, width: 3.w)
+              : (showBorder ? Border.all(color: AppColors.greyIcon, width: 2.w) : null),
         ),
       ),
     );
@@ -202,8 +204,8 @@ class TextEditWidgetState extends State<TextEditWidget> {
       final ui.Image originalImage = frameInfo.image;
       final int originalWidth = originalImage.width;
       final int originalHeight = originalImage.height;
-      const double displayedWidth = 361;
-      const double displayedHeight = 491;
+      final double displayedWidth = 361.w;
+      final double displayedHeight = 491.h;
       final double scaleX = originalWidth / displayedWidth;
       final double scaleY = originalHeight / displayedHeight;
       final ui.PictureRecorder recorder = ui.PictureRecorder();

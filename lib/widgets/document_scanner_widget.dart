@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart'; // для compute
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:opencv_dart/opencv_dart.dart' as cv;
 import 'package:image/image.dart' as img;
 import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
@@ -35,7 +36,7 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
 
   // Дополнительные параметры для корректировки смещения
   double offsetAdjustmentX = 0;
-  double offsetAdjustmentY = -120; // можно настроить под ваш дизайн
+  double offsetAdjustmentY = -120.h; // можно настроить под ваш дизайн
 
   int _frameCounter = 0; // Счётчик кадров для обработки каждого N-ого кадра
   final int _processEveryNthFrame = 2; // например, обрабатывать каждый второй кадр
@@ -291,7 +292,7 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
           ? LayoutBuilder(
         builder: (context, constraints) {
           return Padding(
-            padding: const EdgeInsets.only(top: 60),
+            padding:  EdgeInsets.only(top: 60.h),
             child: Stack(
               alignment: Alignment.topCenter,
               children: [

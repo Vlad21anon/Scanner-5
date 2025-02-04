@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
 
 class GradientSlider extends StatefulWidget {
@@ -22,10 +23,10 @@ class _GradientSliderState extends State<GradientSlider> {
   Widget build(BuildContext context) {
     return SliderTheme(
       data: SliderTheme.of(context).copyWith(
-        trackHeight: 13.0,
+        trackHeight: 13.h,
         thumbShape: _CustomThumbShape(widget.isActive),
         trackShape: _GradientTrackShape(widget.isActive),
-        overlayShape: const RoundSliderOverlayShape(overlayRadius: 20.0),
+        overlayShape:  RoundSliderOverlayShape(overlayRadius: 20.r),
       ),
       child: Slider(
         value: widget.value,

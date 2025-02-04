@@ -2,6 +2,7 @@ import 'dart:io'; // Для File
 import 'dart:math' as math; // Для min/max
 import 'package:defer_pointer/defer_pointer.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image/image.dart' as img; // Для обрезки и кодирования
 import 'package:owl_tech_pdf_scaner/models/scan_file.dart';
 import 'package:owl_tech_pdf_scaner/widgets/resizable_note.dart';
@@ -31,15 +32,15 @@ class CropWidgetState extends State<CropWidget> {
 
   // 4 угла обрезаемой области (в координатах виджета)
   Offset _topLeft = const Offset(0, 0);
-  Offset _topRight = const Offset(250, 50);
-  Offset _bottomLeft = const Offset(50, 350);
-  Offset _bottomRight = const Offset(250, 350);
+  Offset _topRight =  Offset(250.w, 50.h);
+  Offset _bottomLeft =  Offset(50.w, 350.h);
+  Offset _bottomRight =  Offset(250.w, 350.h);
 
   /// Константы для размеров ручек и области нажатия.
-  static const double cornerSize = 13.0;
-  static const Size horizontalSize = Size(39.0, 6.0);
-  static const Size verticalSize = Size(6.0, 39.0);
-  static const double hitSize = 44.0; // Минимальная область нажатия
+  static final double cornerSize = 13.w;
+  static final Size horizontalSize = Size(39.w, 6.h);
+  static final Size verticalSize = Size(6.w, 39.h);
+  static final double hitSize = 44.w; // Минимальная область нажатия
 
   // Какую ручку сейчас тащим
   _HandlePosition? _draggingHandle;
@@ -245,11 +246,11 @@ class CropWidgetState extends State<CropWidget> {
       child: LayoutBuilder(
         builder: (context, constraints) {
           return Padding(
-            padding: const EdgeInsets.only(
-              left: 16,
-              right: 16,
-              top: 24,
-              bottom: 210,
+            padding:  EdgeInsets.only(
+              left: 16.w,
+              right: 16.w,
+              top: 24.h,
+              bottom: 210.h,
             ),
             child: LayoutBuilder(
               builder: (ctx, innerConstraints) {
@@ -345,7 +346,7 @@ class CropWidgetState extends State<CropWidget> {
     late Size visualSize;
     switch (type) {
       case HandleType.corner:
-        visualSize = const Size(cornerSize, cornerSize);
+        visualSize =  Size(cornerSize, cornerSize);
         break;
       case HandleType.horizontal:
         visualSize = horizontalSize;

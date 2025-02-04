@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:owl_tech_pdf_scaner/app/app_icons.dart';
 import 'package:owl_tech_pdf_scaner/blocs/scan_files_cubit/scan_files_cubit.dart';
 import 'package:owl_tech_pdf_scaner/models/scan_file.dart';
 
 import '../app/app_shadows.dart';
 import '../app/app_text_style.dart';
 import '../blocs/files_cubit/files_cubit.dart';
-import '../gen/assets.gen.dart';
 import '../services/file_share_service.dart';
 
 class FilePopup extends StatelessWidget {
@@ -28,12 +28,12 @@ class FilePopup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-        width: 158,
-        height: 129,
-        padding: EdgeInsets.all(16),
+        width: 158.w,
+        height: 136.h,
+        padding: EdgeInsets.all(16.r),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(18.r),
           boxShadow: [
             AppShadows.grey03b3r1o00,
           ],
@@ -50,31 +50,19 @@ class FilePopup extends StatelessWidget {
                   context.read<FilesCubit>().removeFile(file.id);
                 },
                 title: 'Delete',
-                icon: Assets.images.delete.image(
-                  width: 14,
-                  height: 16,
-                  color: AppColors.black,
-                ),
+                icon: AppIcons.deleteBlack14x16,
               ),
-              const SizedBox(height: 16),
+               SizedBox(height: 16.h),
               _buildMenuItem(
                 onTap: () {},
                 title: 'Download',
-                icon: Assets.images.download.image(
-                  width: 16,
-                  height: 16,
-                  color: AppColors.black,
-                ),
+                icon: AppIcons.download16x16,
               ),
-              const SizedBox(height: 16),
+               SizedBox(height: 16.h),
               _buildMenuItem(
                 onTap: _sharePdfFile,
                 title: 'Share',
-                icon: Assets.images.share.image(
-                  width: 14,
-                  height: 16,
-                  color: AppColors.black,
-                ),
+                icon: AppIcons.share14x16,
               ),
             ],
           ),
@@ -95,7 +83,7 @@ class FilePopup extends StatelessWidget {
           Text(
             title,
             style: AppTextStyle.exo16.copyWith(
-              fontSize: 18,
+              fontSize: 18.sp,
             ),
           ),
           icon,

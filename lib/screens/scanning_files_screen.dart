@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
+import 'package:owl_tech_pdf_scaner/app/app_icons.dart';
 import 'package:owl_tech_pdf_scaner/app/app_text_style.dart';
 import 'package:owl_tech_pdf_scaner/blocs/scan_files_cubit/scan_files_cubit.dart';
 import 'package:owl_tech_pdf_scaner/gen/assets.gen.dart';
@@ -21,10 +23,10 @@ class ScanningFilesScreen extends StatelessWidget {
       backgroundColor: AppColors.background,
       body: Column(
         children: [
-          const SizedBox(height: 60),
-          const SizedBox(height: 16),
+           SizedBox(height: 60.h),
+           SizedBox(height: 16.h),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding:  EdgeInsets.symmetric(horizontal: 16.w),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.start,
               children: [
@@ -33,13 +35,9 @@ class ScanningFilesScreen extends StatelessWidget {
                   onTap: () {
                     navigation.pop(context);
                   },
-                  child: Assets.images.arrowLeft.image(
-                    width: 22,
-                    height: 18,
-                    color: AppColors.black,
-                  ),
+                  child: AppIcons.arrowLeftBlack22x18,
                 ),
-                const SizedBox(width: 27),
+                 SizedBox(width: 27.w),
                 Text(
                   'Scanning files',
                   style: AppTextStyle.nunito32,
@@ -51,7 +49,7 @@ class ScanningFilesScreen extends StatelessWidget {
           // Основная часть, в которой отображаем список файлов из кубита
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding:  EdgeInsets.symmetric(horizontal: 16.w),
               child: BlocBuilder<ScanFilesCubit, List<ScanFile>>(
                 builder: (context, files) {
                   if (files.isEmpty) {
@@ -59,9 +57,9 @@ class ScanningFilesScreen extends StatelessWidget {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Assets.images.imagePhotoroom
-                              .image(width: 261, height: 217),
-                          const SizedBox(height: 8),
+                          Assets.images.imagePhotoroom2
+                              .image(width: 261.w, height: 217.h),
+                           SizedBox(height: 8.h),
                           Text(
                             "Oops, nothing here yet!\nTap \"+\" to add something new!",
                             style: AppTextStyle.exo16,
@@ -76,7 +74,7 @@ class ScanningFilesScreen extends StatelessWidget {
                   return ListView.separated(
                     itemCount: files.length,
                     separatorBuilder: (context, _) =>
-                        const SizedBox(height: 16),
+                         SizedBox(height: 16.h),
                     itemBuilder: (context, index) {
                       final file = files[index];
                       return FileCard(

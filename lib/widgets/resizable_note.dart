@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:defer_pointer/defer_pointer.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'dart:math' as math;
 
 import '../app/app_colors.dart';
@@ -24,19 +25,19 @@ class ResizableNote extends StatefulWidget {
 
 class _ResizableNoteState extends State<ResizableNote> {
   // Минимальные размеры заметки
-  static const double minWidth = 50;
-  static const double minHeight = 50;
+  static final double minWidth = 50.w;
+  static final double minHeight = 50.h;
 
   // Визуальный размер ручек (не hit area)
-  static const double cornerSize = 11;
-  static const Size horizontalSize = Size(17, 6);
-  static const Size verticalSize = Size(6, 17);
+  static final double cornerSize = 11.w;
+  static final Size horizontalSize = Size(17.w, 6.h);
+  static final Size verticalSize = Size(6.w, 17.h);
 
   // Минимальный размер области нажатия (hit area)
-  static const double hitSize = 40.0;
+  static final double hitSize = 40.w;
 
   // Для позиционирования используем половину hitSize (15)
-  static const double hitOffset = hitSize / 2;
+  static final double hitOffset = hitSize / 2;
 
   final _deferredPointerLink = DeferredPointerHandlerLink();
 
@@ -59,7 +60,7 @@ class _ResizableNoteState extends State<ResizableNote> {
             width: widget.note.size.width,
             height: widget.note.size.height,
             decoration: BoxDecoration(
-              border: Border.all(color: AppColors.blueLight, width: 1),
+              border: Border.all(color: AppColors.blueLight, width: 1.w),
             ),
             child: Stack(
               clipBehavior: Clip.none,
@@ -223,7 +224,7 @@ class _ResizableNoteState extends State<ResizableNote> {
     BoxDecoration decoration;
     switch (type) {
       case HandleType.corner:
-        visualSize = const Size(cornerSize, cornerSize);
+        visualSize = Size(cornerSize, cornerSize);
         decoration = BoxDecoration(
           color: Colors.white,
           border: Border.all(color: AppColors.blueLight),
@@ -235,7 +236,7 @@ class _ResizableNoteState extends State<ResizableNote> {
         decoration = BoxDecoration(
           color: Colors.white,
           border: Border.all(color: AppColors.blueLight),
-          borderRadius: BorderRadius.circular(11),
+          borderRadius: BorderRadius.circular(11.r),
         );
         break;
       case HandleType.vertical:
@@ -243,7 +244,7 @@ class _ResizableNoteState extends State<ResizableNote> {
         decoration = BoxDecoration(
           color: Colors.white,
           border: Border.all(color: AppColors.blueLight),
-          borderRadius: BorderRadius.circular(11),
+          borderRadius: BorderRadius.circular(11.r),
         );
         break;
     }

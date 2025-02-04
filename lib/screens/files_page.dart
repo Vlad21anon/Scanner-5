@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:owl_tech_pdf_scaner/app/app_icons.dart';
 import 'package:owl_tech_pdf_scaner/app/app_text_style.dart';
 import 'package:owl_tech_pdf_scaner/gen/assets.gen.dart';
 import 'package:owl_tech_pdf_scaner/models/scan_file.dart';
 import 'package:owl_tech_pdf_scaner/screens/onboarding_screen.dart';
 import 'package:owl_tech_pdf_scaner/screens/pdf_edit_screen.dart';
-import 'package:owl_tech_pdf_scaner/screens/subscription_selection_screen.dart';
 import 'package:owl_tech_pdf_scaner/services/navigation_service.dart';
 
 import '../blocs/files_cubit/files_cubit.dart';
@@ -37,10 +38,10 @@ class _FilesPageState extends State<FilesPage> {
             final sortedFiles = context.read<FilterCubit>().applyFilter(files);
             return Column(
               children: [
-                const SizedBox(height: 60),
-                const SizedBox(height: 16),
+                SizedBox(height: 60.h),
+                SizedBox(height: 16.h),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: EdgeInsets.symmetric(horizontal: 16.w),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -60,10 +61,9 @@ class _FilesPageState extends State<FilesPage> {
                                           .removeFile(file.id);
                                     });
                                   },
-                                  child: Assets.images.delete
-                                      .image(width: 24, height: 24),
+                                  child: AppIcons.deleteBlue24x24,
                                 ),
-                                const SizedBox(width: 8),
+                                SizedBox(width: 8.w),
                               ],
                             ),
                           CustomCircularButton(
@@ -74,8 +74,8 @@ class _FilesPageState extends State<FilesPage> {
                                 builder: (context) => Stack(
                                   children: [
                                     Positioned(
-                                      right: 16,
-                                      top: 137,
+                                      right: 16.w,
+                                      top: 137.h,
                                       child: Material(
                                         color: Colors.transparent,
                                         child: FilterPopup(),
@@ -85,8 +85,7 @@ class _FilesPageState extends State<FilesPage> {
                                 ),
                               );
                             },
-                            child: Assets.images.filter
-                                .image(width: 24, height: 12),
+                            child: AppIcons.filterBlack24x12,
                           ),
                         ],
                       ),
@@ -95,7 +94,7 @@ class _FilesPageState extends State<FilesPage> {
                 ),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: EdgeInsets.symmetric(horizontal: 16.w),
                     child: sortedFiles.isEmpty
                         ? Center(
                             child: Column(
@@ -103,19 +102,21 @@ class _FilesPageState extends State<FilesPage> {
                               children: [
                                 ElevatedButton(
                                   onPressed: () {
-                                    navigation.navigateTo(context, DocumentScannerTest());
+                                    navigation.navigateTo(
+                                        context, DocumentScannerTest());
                                   },
                                   child: Text('DocumentScannerTest'),
                                 ),
                                 ElevatedButton(
                                   onPressed: () {
-                                    navigation.navigateTo(context, OnboardingScreen());
+                                    navigation.navigateTo(
+                                        context, OnboardingScreen());
                                   },
                                   child: Text('OnboardingScreen'),
                                 ),
                                 Assets.images.imagePhotoroom2
-                                    .image(width: 261, height: 217),
-                                const SizedBox(height: 8),
+                                    .image(width: 261.w, height: 217.h),
+                                SizedBox(height: 8.h),
                                 Text(
                                   "Oops, nothing here yet!\nTap \"+\" to add something new!",
                                   style: AppTextStyle.exo16,
@@ -159,7 +160,7 @@ class _FilesPageState extends State<FilesPage> {
                             itemCount: sortedFiles.length,
                             separatorBuilder:
                                 (BuildContext context, int index) =>
-                                    const SizedBox(height: 16),
+                                    SizedBox(height: 16.h),
                           ),
                   ),
                 ),

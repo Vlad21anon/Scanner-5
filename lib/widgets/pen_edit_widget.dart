@@ -2,7 +2,9 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
+import 'package:owl_tech_pdf_scaner/app/app_icons.dart';
 import 'package:owl_tech_pdf_scaner/app/app_text_style.dart';
 import 'package:owl_tech_pdf_scaner/gen/assets.gen.dart';
 import 'package:owl_tech_pdf_scaner/models/draw_point.dart';
@@ -44,6 +46,7 @@ class PenEditWidgetState extends State<PenEditWidget> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: AppColors.background,
       body: RepaintBoundary(
         key: _globalKey,
@@ -53,7 +56,7 @@ class PenEditWidgetState extends State<PenEditWidget> {
               Align(
                 alignment: Alignment.topCenter,
                 child: Padding(
-                  padding: const EdgeInsets.only(top: 24),
+                  padding: EdgeInsets.only(top: 24.h),
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       // Сохраняем реальные размеры контейнера
@@ -67,13 +70,13 @@ class PenEditWidgetState extends State<PenEditWidget> {
                         }
                       });
                       // Фиксированные размеры для изображения, если они требуются
-                      const double containerWidth = 361;
-                      const double containerHeight = 491;
+                      final double containerWidth = 361.w;
+                      final double containerHeight = 491.h;
                       return SizedBox(
                         width: containerWidth,
                         height: containerHeight,
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(12.r),
                           child: Image.file(
                             File(widget.file.path),
                             key: imageKey,
@@ -94,34 +97,34 @@ class PenEditWidgetState extends State<PenEditWidget> {
                 );
               }),
               DraggableScrollableSheet(
-                initialChildSize: addPenMode ? 0.82 : 0.5,
-                minChildSize: addPenMode ? 0.82 : 0.2,
-                maxChildSize: addPenMode ? 0.82 : 0.5,
+                initialChildSize: addPenMode ? 0.83.h : 0.5.h,
+                minChildSize: addPenMode ? 0.83.h : 0.1.h,
+                maxChildSize: addPenMode ? 0.83.h : 0.5.h,
                 builder: (context, scrollController) {
                   return Container(
                     decoration: BoxDecoration(
                       color: AppColors.white,
                       borderRadius:
-                      BorderRadius.vertical(top: Radius.circular(30)),
+                      BorderRadius.vertical(top: Radius.circular(30.r)),
                     ),
                     child: ListView(
                       controller: scrollController,
                       physics: addPenMode
                           ? const NeverScrollableScrollPhysics()
                           : const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.all(16),
+                      padding: EdgeInsets.all(16.r),
                       children: [
                         Center(
                           child: Container(
-                            width: 110,
-                            height: 4,
+                            width: 110.w,
+                            height: 4.h,
                             decoration: BoxDecoration(
                               color: AppColors.black,
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(8.r),
                             ),
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        SizedBox(height: 8.h),
                         addPenMode
                             ? Row(
                           mainAxisAlignment:
@@ -138,11 +141,11 @@ class PenEditWidgetState extends State<PenEditWidget> {
                                       NoteData(
                                         points:
                                         List.from(_currentDrawing),
-                                        offset: const Offset(100, 100),
+                                        offset: Offset(100.w, 100.w),
                                         color: _textColor,
                                         strokeWidth: _fontSize,
-                                        size: const Size(150, 100),
-                                        baseSize: const Size(361, 203),
+                                        size:  Size(150.w, 100.h),
+                                        baseSize:  Size(361.w, 203.h),
                                       ),
                                     );
                                     _currentDrawing.clear();
@@ -151,31 +154,27 @@ class PenEditWidgetState extends State<PenEditWidget> {
                                   addPenMode = false;
                                 });
                               },
-                              child: Assets.images.select.image(
-                                width: 22,
-                                height: 15,
-                                color: AppColors.black,
-                              ),
+                              child: AppIcons.selectBlack22x15,
                             ),
                           ],
                         )
                             : Text('Saved sign', style: AppTextStyle.exo20),
-                        const SizedBox(height: 18),
+                        SizedBox(height: 18.h),
                         addPenMode
                             ? Container(
                           key: _drawingKey,
                           decoration: BoxDecoration(
                             borderRadius:
-                            const BorderRadius.all(Radius.circular(12)),
+                             BorderRadius.all(Radius.circular(12.r)),
                             color: AppColors.white,
                             border: Border.all(
-                              width: 2,
+                              width: 2.w,
                               color: AppColors.greyIcon,
                             ),
                           ),
-                          padding: const EdgeInsets.all(8),
-                          width: 361,
-                          height: 203,
+                          padding:  EdgeInsets.all(8.w),
+                          width: 361.w,
+                          height: 203.h,
                           child: GestureDetector(
                             onPanStart: (details) {
                               setState(() {
@@ -205,7 +204,7 @@ class PenEditWidgetState extends State<PenEditWidget> {
                                 points: _currentDrawing,
                                 color: _textColor,
                                 strokeWidth: _fontSize,
-                                baseSize: const Size(361, 203),
+                                baseSize: Size(361.w, 203.h),
                               ),
                               child: Container(),
                             ),
@@ -214,23 +213,23 @@ class PenEditWidgetState extends State<PenEditWidget> {
                             : Wrap(
                           alignment: WrapAlignment.start,
                           crossAxisAlignment: WrapCrossAlignment.center,
-                          spacing: 16,
-                          runSpacing: 8,
+                          spacing: 16.w,
+                          runSpacing: 8.w,
                           children: [
                             ..._notes.map((note) {
                               return Container(
                                 decoration: BoxDecoration(
-                                  borderRadius: const BorderRadius.all(
-                                      Radius.circular(12)),
+                                  borderRadius:  BorderRadius.all(
+                                      Radius.circular(12.r)),
                                   color: AppColors.white,
                                   border: Border.all(
-                                    width: 2,
+                                    width: 2.w,
                                     color: AppColors.greyIcon,
                                   ),
                                 ),
-                                padding: const EdgeInsets.all(8),
-                                width: 148,
-                                height: 95,
+                                padding:  EdgeInsets.all(8.w),
+                                width: 148.w,
+                                height: 95.h,
                                 child: Stack(
                                   children: [
                                     CustomPaint(
@@ -251,10 +250,7 @@ class PenEditWidgetState extends State<PenEditWidget> {
                                             _notes.remove(note);
                                           });
                                         },
-                                        child: Assets.images.x.image(
-                                          width: 12,
-                                          height: 12,
-                                        ),
+                                        child: AppIcons.x22x15,
                                       ),
                                     ),
                                   ],
@@ -269,11 +265,7 @@ class PenEditWidgetState extends State<PenEditWidget> {
                                   addPenMode = true;
                                 });
                               },
-                              child: Assets.images.plus.image(
-                                width: 22,
-                                height: 22,
-                                color: AppColors.black,
-                              ),
+                              child: AppIcons.plusBlack22x22,
                             ),
                           ],
                         ),
@@ -281,9 +273,9 @@ class PenEditWidgetState extends State<PenEditWidget> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const SizedBox(height: 24),
+                               SizedBox(height: 24.h),
                               Text('Font Size', style: AppTextStyle.exo20),
-                              const SizedBox(height: 16),
+                               SizedBox(height: 16.h),
                               Row(
                                 children: [
                                   Text('Small', style: AppTextStyle.exo16),
@@ -301,15 +293,15 @@ class PenEditWidgetState extends State<PenEditWidget> {
                                   Text('Large', style: AppTextStyle.exo16),
                                 ],
                               ),
-                              const SizedBox(height: 24),
+                               SizedBox(height: 24.h),
                               Text('Color', style: AppTextStyle.exo20),
-                              const SizedBox(height: 16),
+                               SizedBox(height: 16.h),
                               SingleChildScrollView(
                                 scrollDirection: Axis.horizontal,
                                 child: Row(
                                   children: [
                                     _eraserDot(),
-                                    const SizedBox(width: 8),
+                                     SizedBox(width: 8.w),
                                     _colorDot(Colors.black),
                                     _colorDot(Colors.white),
                                     _colorDot(Colors.grey),
@@ -324,7 +316,7 @@ class PenEditWidgetState extends State<PenEditWidget> {
                                   ],
                                 ),
                               ),
-                              const SizedBox(height: 16),
+                               SizedBox(height: 16.h),
                             ],
                           ),
                       ],
@@ -349,16 +341,16 @@ class PenEditWidgetState extends State<PenEditWidget> {
         });
       },
       child: Container(
-        margin: const EdgeInsets.only(right: 8),
-        width: 30,
-        height: 30,
+        margin:  EdgeInsets.only(right: 8.w),
+        width: 30.w,
+        height: 30.w,
         decoration: BoxDecoration(
           color: color,
           shape: BoxShape.circle,
           border: isSelected
-              ? Border.all(color: AppColors.black, width: 3)
+              ? Border.all(color: AppColors.black, width: 3.w)
               : (showBorder
-              ? Border.all(color: AppColors.greyIcon, width: 2)
+              ? Border.all(color: AppColors.greyIcon, width: 2.w)
               : null),
         ),
       ),
@@ -372,10 +364,11 @@ class PenEditWidgetState extends State<PenEditWidget> {
           isSelectEraser = !isSelectEraser;
         });
       },
-      child: SizedBox(
-        width: 30,
-        height: 30,
-        child: Assets.images.eraser.image(width: 28, height: 26),
+      child: Container(
+        width: 30.w,
+        height: 30.w,
+        color: Colors.transparent,
+        child: Center(child: FittedBox(child: AppIcons.eraser28x26,),),
       ),
     );
   }
@@ -393,8 +386,8 @@ class PenEditWidgetState extends State<PenEditWidget> {
       final int originalWidth = originalImage.width;
       final int originalHeight = originalImage.height;
       // Если размеры контейнера не сохранены, используем дефолтные значения.
-      final double displayedWidth = _displayedWidth ?? 361;
-      final double displayedHeight = _displayedHeight ?? 491;
+      final double displayedWidth = _displayedWidth ?? 361.w;
+      final double displayedHeight = _displayedHeight ?? 491.h;
       final double scaleX = originalWidth / displayedWidth;
       final double scaleY = originalHeight / displayedHeight;
       final ui.PictureRecorder recorder = ui.PictureRecorder();

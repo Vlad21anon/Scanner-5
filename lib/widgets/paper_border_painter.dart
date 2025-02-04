@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../app/app_colors.dart';
 
 /// CustomPainter, который получает список 4 углов (в исходных координатах), размер кадра и параметры поворота.
@@ -16,7 +17,7 @@ class PaperBorderPainter extends CustomPainter {
   final double offsetAdjustmentY;
 
   // Размер угловой ручки (аналог cornerSize)
-  static const double handleCornerSize = 11;
+  static final double handleCornerSize = 11.w;
 
   PaperBorderPainter({
     required this.corners,

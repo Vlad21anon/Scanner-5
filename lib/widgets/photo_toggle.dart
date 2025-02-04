@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../app/app_colors.dart';
 import '../app/app_text_style.dart';
@@ -25,7 +26,7 @@ class _PhotoToggleState extends State<PhotoToggle> {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 200, // Общая ширина контейнера
+      width: 200.w, // Общая ширина контейнера
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -48,8 +49,8 @@ class _PhotoToggleState extends State<PhotoToggle> {
     return GestureDetector(
       onTap: toggleSelection,
       child: SizedBox(
-        width: 60,
-        height: 30,
+        width: 60.w,
+        height: 30.h,
         child: Center(
           child: Text(
             text,
