@@ -230,9 +230,11 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
         corners.add(Offset(pt[0], pt[1]));
       }
 
-      setState(() {
-        _paperCorners = corners.length == 4 ? corners : null;
-      });
+      if (mounted) {
+        setState(() {
+          _paperCorners = corners.length == 4 ? corners : null;
+        });
+      }
     } catch (e, stackTrace) {
       debugPrint("Ошибка в _processCameraImage: $e");
       debugPrint("$stackTrace");

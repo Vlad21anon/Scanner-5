@@ -12,6 +12,7 @@ import 'package:owl_tech_pdf_scaner/screens/pdf_edit_screen.dart';
 import 'package:owl_tech_pdf_scaner/screens/scanning_files_screen.dart';
 import 'package:owl_tech_pdf_scaner/services/navigation_service.dart';
 import '../gen/assets.gen.dart';
+import '../services/permission_service.dart';
 import '../widgets/custom_circular_button.dart';
 import '../widgets/document_scanner_widget.dart';
 import '../widgets/photo_toggle.dart';
@@ -39,6 +40,8 @@ class _ScanScreenState extends State<ScanScreen> {
   @override
   void initState() {
     super.initState();
+    // Запрашиваем разрешения на камеру и микрофон при запуске экрана
+    PermissionService().requestCameraAndMicrophonePermissions();
     _initCamera();
   }
 

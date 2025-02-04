@@ -9,26 +9,6 @@ import 'dart:math' as math;
 
 import 'package:owl_tech_pdf_scaner/services/navigation_service.dart';
 
-/// Кастомная физика, разрешающая только прокрутку вперед.
-class OnlyForwardScrollPhysics extends ScrollPhysics {
-  const OnlyForwardScrollPhysics({ScrollPhysics? parent}) : super(parent: parent);
-
-  @override
-  OnlyForwardScrollPhysics applyTo(ScrollPhysics? ancestor) {
-    return OnlyForwardScrollPhysics(parent: buildParent(ancestor));
-  }
-
-  @override
-  double applyBoundaryConditions(ScrollMetrics position, double value) {
-    // Если новое значение меньше текущей позиции, значит пользователь пытается листать назад.
-    // Возвращаем разницу, чтобы запретить движение назад.
-    if (value < position.pixels) {
-      return position.pixels - value;
-    }
-    return 0.0;
-  }
-}
-
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -86,17 +66,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             child: SizedBox(
               height: 573.h,
               width: double.infinity,
-              child: PageView(
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (notification) {
+                  // Если во время обновления скролла обнаружено, что текущая позиция меньше,
+                  // чем индекс текущей страницы, возвращаемся на _currentPage.
+                  if (notification is ScrollUpdateNotification) {
+                    if (_pageController.page != null && _pageController.page! < _currentPage) {
+                      _pageController.jumpToPage(_currentPage);
+                    }
+                  }
+                  return false;
+                },
+                child: PageView(
                 controller: _pageController,
-                // Используем кастомную физику, запрещающую прокрутку назад.
-                physics: const OnlyForwardScrollPhysics(),
                 onPageChanged: (int index) {
                   setState(() {
                     _currentPage = index;
                   });
                 },
                 children: _pages,
-              ),
+              ),),
             ),
           ),
           // Индикатор страницы и кнопка Skip (дизайн сохраняется)

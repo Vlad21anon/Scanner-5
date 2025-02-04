@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
+import 'package:owl_tech_pdf_scaner/app/app_icons.dart';
 import 'package:owl_tech_pdf_scaner/screens/scan_screen.dart';
 
 import '../app/app_shadows.dart';
@@ -20,42 +23,43 @@ class CustomNavigationBar extends StatelessWidget {
       alignment: Alignment.center,
       children: [
         Container(
-          height: 59,
-          width: 203,
+          height: 59.h,
+          width: 203.w,
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(100),
+            borderRadius: BorderRadius.circular(100.r),
             boxShadow: [
               AppShadows.grey03b3r1o00,
             ],
           ),
           child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 6),
+            padding: EdgeInsets.symmetric(horizontal: 6.w),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 GestureDetector(
                   onTap: () => onTap(0),
-                  child: SizedBox(
-                    width: 54,
-                    height: 54,
-                    child: Assets.images.files.image(
-                      width: 19,
-                      height: 22,
-                      color: currentIndex == 0
-                          ? AppColors.blue
-                          : AppColors.greyIcon,
-                    ),
-                  ),
+                  child: Container(
+                      padding: EdgeInsets.all(16.w),
+                      color: Colors.transparent,
+                      child: SvgPicture.asset(
+                        Assets.icons.files,
+                        width: 19.w,
+                        height: 22.w,
+                        color: currentIndex == 0
+                            ? AppColors.blue
+                            : AppColors.greyIcon,
+                      )),
                 ),
                 GestureDetector(
                   onTap: () => onTap(1),
-                  child: SizedBox(
-                    width: 54,
-                    height: 54,
-                    child: Assets.images.settings.image(
-                      width: 22,
-                      height: 20,
+                  child: Container(
+                    padding: EdgeInsets.all(16.w),
+                    color: Colors.transparent,
+                    child: SvgPicture.asset(
+                      Assets.icons.settings,
+                      width: 22.w,
+                      height: 20.w,
                       color: currentIndex == 1
                           ? AppColors.blue
                           : AppColors.greyIcon,
@@ -67,7 +71,7 @@ class CustomNavigationBar extends StatelessWidget {
           ),
         ),
         Positioned(
-          bottom: 12,
+          bottom: 12.h,
           child: GestureDetector(
             onTap: () {
               final navigator = NavigationService();
@@ -75,16 +79,14 @@ class CustomNavigationBar extends StatelessWidget {
               navigator.navigateTo(context, ScanScreen());
             },
             child: Container(
-              width: 64,
-              height: 64,
-              decoration:
-              BoxDecoration(shape: BoxShape.circle, color: AppColors.blue),
-              child: Assets.images.plus.image(
-                width: 22,
-                height: 22,
+              padding: EdgeInsets.all(21.w),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.blue,
               ),
+              child: AppIcons.plusWhite22x22,
             ),
-          )
+          ),
         ),
       ],
     );

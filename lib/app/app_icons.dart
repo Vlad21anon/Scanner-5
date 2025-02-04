@@ -33,4 +33,11 @@ class AppIcons {
     height: 63.w,
     color: AppColors.white,
   );
+
+  static Widget plusWhite22x22 = SvgPicture.asset(
+    Assets.icons.plus,
+    width: 22.w,
+    height: 22.w,
+    color: AppColors.white,
+  );
 }

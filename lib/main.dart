@@ -12,7 +12,6 @@ import 'package:owl_tech_pdf_scaner/screens/files_page.dart';
 import 'package:owl_tech_pdf_scaner/screens/loading_screen.dart';
 import 'package:owl_tech_pdf_scaner/screens/settings_page.dart';
 import 'package:owl_tech_pdf_scaner/services/navigation_service.dart';
-import 'package:owl_tech_pdf_scaner/services/permission_service.dart';
 import 'package:owl_tech_pdf_scaner/services/revenuecat_service.dart';
 import 'package:owl_tech_pdf_scaner/widgets/custom_navigation_bar.dart';
 import 'package:owl_tech_pdf_scaner/screens/onboarding_screen.dart';
@@ -143,8 +142,6 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
-    // Запрашиваем разрешения на камеру и микрофон при запуске экрана
-    PermissionService().requestCameraAndMicrophonePermissions();
   }
 
   @override
@@ -159,7 +156,7 @@ class _MainScreenState extends State<MainScreen> {
             children: _screens,
           ),
           Positioned(
-            bottom: 46,
+            bottom: 46.h,
             child: CustomNavigationBar(
               currentIndex: _selectedIndex,
               onTap: (index) => setState(() => _selectedIndex = index),
