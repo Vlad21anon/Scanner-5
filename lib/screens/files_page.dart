@@ -7,9 +7,11 @@ import 'package:owl_tech_pdf_scaner/gen/assets.gen.dart';
 import 'package:owl_tech_pdf_scaner/models/scan_file.dart';
 import 'package:owl_tech_pdf_scaner/screens/pdf_edit_screen.dart';
 import 'package:owl_tech_pdf_scaner/services/navigation_service.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
 
 import '../blocs/files_cubit.dart';
 import '../blocs/filter_cubit.dart';
+import '../services/revenuecat_service.dart';
 import '../widgets/custom_circular_button.dart';
 import '../widgets/file_card.dart';
 import '../widgets/filter_popup.dart';
@@ -105,13 +107,13 @@ class _FilesPageState extends State<FilesPage> {
                                 //   },
                                 //   child: Text('DocumentScannerTest'),
                                 // ),
-                                // ElevatedButton(
-                                //   onPressed: () {
-                                //     navigation.navigateTo(
-                                //         context, OnboardingScreen());
-                                //   },
-                                //   child: Text('OnboardingScreen'),
-                                // ),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    navigation.navigateTo(
+                                        context, SubscriptionTestPage());
+                                  },
+                                  child: Text('OnboardingScreen'),
+                                ),
                                 Assets.images.imagePhotoroom2
                                     .image(width: 261.w, height: 217.h),
                                 SizedBox(height: 8.h),
@@ -168,6 +170,71 @@ class _FilesPageState extends State<FilesPage> {
           },
         );
       },
+    );
+  }
+}
+
+class SubscriptionTestPage extends StatefulWidget {
+  const SubscriptionTestPage({Key? key}) : super(key: key);
+
+  @override
+  _SubscriptionTestPageState createState() => _SubscriptionTestPageState();
+}
+
+class _SubscriptionTestPageState extends State<SubscriptionTestPage> {
+  String _info = "Загрузка данных...";
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSubscriptionData();
+  }
+
+  Future<void> _loadSubscriptionData() async {
+    // Инициализируем RevenueCat
+    await RevenueCatService().init();
+
+    try {
+      // Получаем информацию о покупателе
+      final customerInfo = await Purchases.getCustomerInfo();
+      final bool isSubscribed = customerInfo.entitlements.active.isNotEmpty;
+
+      // Получаем офферы (пакеты подписок)
+      final offerings = await Purchases.getOfferings();
+      String offeringsText = "";
+      if (offerings.current != null &&
+          offerings.current!.availablePackages.isNotEmpty) {
+        for (var pkg in offerings.current!.availablePackages) {
+          offeringsText += "Пакет: ${pkg.identifier}\n";
+          offeringsText += "Название: ${pkg.presentedOfferingContext.offeringIdentifier}\n";
+          offeringsText += "Описание: ${pkg.storeProduct.title}\n";
+          offeringsText += "Цена: ${pkg.storeProduct.priceString}\n\n";
+        }
+      } else {
+        offeringsText = "Офферы недоступны";
+      }
+
+      setState(() {
+        _info = "Статус подписки: ${isSubscribed ? "активна" : "не активна"}\n\nОфферы:\n$offeringsText";
+      });
+    } catch (e) {
+      setState(() {
+        _info = "Ошибка при загрузке данных: $e";
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Тест подписок RevenueCat")),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Text(
+          _info,
+          style: const TextStyle(fontSize: 16),
+        ),
+      ),
     );
   }
 }
