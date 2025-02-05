@@ -59,9 +59,9 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
   double getOffsetAdjustmentY(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
     if (screenHeight >= 800) {
-      return -85;
+      return -120;
     } else {
-      return -55;
+      return -90;
     }
   }
 
@@ -69,7 +69,7 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
     final cameras = await availableCameras();
     _controller = CameraController(
       cameras[0],
-      ResolutionPreset.medium,
+      ResolutionPreset.max,
       imageFormatGroup: ImageFormatGroup.yuv420,
     );
     await _controller.initialize();
