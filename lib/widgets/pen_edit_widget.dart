@@ -14,8 +14,6 @@ import 'package:owl_tech_pdf_scaner/widgets/handwriting_painter.dart';
 import 'package:owl_tech_pdf_scaner/widgets/%D1%81ustom_slider.dart';
 import 'package:owl_tech_pdf_scaner/widgets/resizable_note.dart';
 
-import '../services/screen_service.dart';
-
 class PenEditWidget extends StatefulWidget {
   final ScanFile file;
   final Function(File)? onSave;
