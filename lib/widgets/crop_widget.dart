@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:defer_pointer/defer_pointer.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image/image.dart' as img;
@@ -112,30 +113,32 @@ class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
       debugPrint('Файл не найден: $pagePath');
       return;
     }
+
+    // Подготовка параметров для обрезки
+    final cropRect = _calculateRealCropRect(
+      containerSize: _containerSize,
+      imageWidth: _imageWidth,
+      imageHeight: _imageHeight,
+    );
+
+    if (cropRect.width <= 0 || cropRect.height <= 0) {
+      debugPrint('Некорректные размеры обрезки: $cropRect');
+      return;
+    }
+
+    final params = {
+      'filePath': pagePath,
+      'cropRect': {
+        'left': cropRect.left,
+        'top': cropRect.top,
+        'width': cropRect.width,
+        'height': cropRect.height,
+      },
+    };
+
     try {
-      final fileBytes = await file.readAsBytes();
-      final original = img.decodeImage(fileBytes);
-      if (original == null) {
-        debugPrint('Не удалось декодировать изображение');
-        return;
-      }
-      final cropRect = _calculateRealCropRect(
-        containerSize: _containerSize,
-        imageWidth: _imageWidth,
-        imageHeight: _imageHeight,
-      );
-      if (cropRect.width <= 0 || cropRect.height <= 0) {
-        debugPrint('Некорректные размеры обрезки: $cropRect');
-        return;
-      }
-      final cropped = img.copyCrop(
-        original,
-        x: cropRect.left.toInt(),
-        y: cropRect.top.toInt(),
-        width: cropRect.width.toInt(),
-        height: cropRect.height.toInt(),
-      );
-      final newBytes = img.encodePng(cropped);
+      // Вызываем функцию в изоляте
+      final newBytes = await compute(_processImageInIsolate, params);
       await file.writeAsBytes(newBytes);
       debugPrint('Обрезка для страницы $_currentPageIndex сохранена');
       imageCache.clear();
@@ -591,4 +594,30 @@ class _CropPainter extends CustomPainter {
         bottomLeft != oldDelegate.bottomLeft ||
         bottomRight != oldDelegate.bottomRight;
   }
+}
+
+// Функция, которую будем запускать в изоляте.
+/// Принимает map с параметрами и возвращает результат обработки.
+Future<List<int>> _processImageInIsolate(Map<String, dynamic> params) async {
+  final String filePath = params['filePath'];
+  final Map<String, double> cropRect = params['cropRect']; // left, top, width, height
+
+  // Читаем файл и декодируем изображение
+  final fileBytes = await File(filePath).readAsBytes();
+  final original = img.decodeImage(fileBytes);
+  if (original == null) {
+    throw Exception('Не удалось декодировать изображение');
+  }
+
+  // Обрезаем изображение
+  final cropped = img.copyCrop(
+    original,
+    x: cropRect['left']!.toInt(),
+    y: cropRect['top']!.toInt(),
+    width: cropRect['width']!.toInt(),
+    height: cropRect['height']!.toInt(),
+  );
+
+  // Кодируем изображение в PNG
+  return img.encodePng(cropped);
 }

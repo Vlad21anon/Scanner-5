@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart'; // для compute
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:opencv_dart/opencv_dart.dart' as cv;
 import 'package:image/image.dart' as img;
 import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
@@ -39,7 +40,8 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
   double offsetAdjustmentY = -55; // можно настроить под ваш дизайн
 
   int _frameCounter = 0; // Счётчик кадров для обработки каждого N-ого кадра
-  final int _processEveryNthFrame = 2; // например, обрабатывать каждый второй кадр
+  final int _processEveryNthFrame =
+      2; // например, обрабатывать каждый второй кадр
   bool _isVisible = true; // Флаг, отражающий, отображается ли виджет на экране
 
   @override
@@ -59,17 +61,27 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
   double getOffsetAdjustmentY(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
     if (screenHeight >= 800) {
-      return -85;
+      return -45;
     } else {
-      return -55;
+      return -15;
     }
   }
+
+  // ResolutionPreset.medium,
+  // double getOffsetAdjustmentY(BuildContext context) {
+  //   final screenHeight = MediaQuery.of(context).size.height;
+  //   if (screenHeight >= 800) {
+  //     return -85;
+  //   } else {
+  //     return -55;
+  //   }
+  // }
 
   Future<void> _initCamera() async {
     final cameras = await availableCameras();
     _controller = CameraController(
       cameras[0],
-      ResolutionPreset.medium,
+      ResolutionPreset.high,
       imageFormatGroup: ImageFormatGroup.yuv420,
     );
     await _controller.initialize();
@@ -173,7 +185,7 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
           double vVal = v.toDouble() - 128.0;
           int r = (yVal + 1.402 * vVal).round().clamp(0, 255);
           int g =
-          (yVal - 0.344136 * uVal - 0.714136 * vVal).round().clamp(0, 255);
+              (yVal - 0.344136 * uVal - 0.714136 * vVal).round().clamp(0, 255);
           int b = (yVal + 1.772 * uVal).round().clamp(0, 255);
           rgbImage.setPixelRgba(x, y, r, g, b, 255);
         }
@@ -202,7 +214,7 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
           double vVal = vp.toDouble() - 128.0;
           int r = (yVal + 1.402 * vVal).round().clamp(0, 255);
           int g =
-          (yVal - 0.344136 * uVal - 0.714136 * vVal).round().clamp(0, 255);
+              (yVal - 0.344136 * uVal - 0.714136 * vVal).round().clamp(0, 255);
           int b = (yVal + 1.772 * uVal).round().clamp(0, 255);
           rgbImage.setPixelRgba(x, y, r, g, b, 255);
         }
@@ -259,9 +271,8 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
       Uint8List pngBytes = await compute(convertYUV420ToPNGFromMap, imageMap);
 
       _lastPngBytes = pngBytes;
-      debugPrint("Начинаем обработку кадра. Размер изображения: ${image.width}x${image.height}");
-
-
+      debugPrint(
+          "Начинаем обработку кадра. Размер изображения: ${image.width}x${image.height}");
 
       // Если виджет не виден, нет смысла выполнять дальнейшую обработку
       if (!_isVisible) return;
@@ -277,8 +288,7 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
         return;
       }
 
-      List<List<double>> cornersList =
-      result['corners'] as List<List<double>>;
+      List<List<double>> cornersList = result['corners'] as List<List<double>>;
 
       debugPrint("Получено ${cornersList.length} углов из изолята");
 
@@ -341,7 +351,8 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
       cv.Mat finalMat;
       if (!Platform.isIOS) {
         finalMat = cv.rotate(rgbMat, cv.ROTATE_90_CLOCKWISE);
-        debugPrint("Изображение повернуто: ширина = ${finalMat.width}, высота = ${finalMat.height}");
+        debugPrint(
+            "Изображение повернуто: ширина = ${finalMat.width}, высота = ${finalMat.height}");
         rgbMat.dispose();
       } else {
         finalMat = rgbMat;
@@ -353,7 +364,8 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
         throw Exception("Ошибка при кодировании изображения в PNG");
       }
       Uint8List pngBytesf = result.$2;
-      debugPrint("Размер итогового изображения (PNG): ${pngBytesf.lengthInBytes} байт");
+      debugPrint(
+          "Размер итогового изображения (PNG): ${pngBytesf.lengthInBytes} байт");
 
       finalMat.dispose();
       imageBytes = pngBytesf;
@@ -382,7 +394,6 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
     }
     return null;
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -421,29 +432,41 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
         backgroundColor: AppColors.black,
         body: _isCameraInitialized
             ? LayoutBuilder(
-          builder: (context, constraints) {
-            return Padding(
-              padding: const EdgeInsets.only(top: 60),
-              child: Stack(
-                alignment: Alignment.topCenter,
-                children: [
-                  CameraPreview(_controller),
-                  if (_paperCorners != null && _cameraImageSize != null)
-                    CustomPaint(
-                      size: Size(constraints.maxWidth, constraints.maxHeight),
-                      painter: PaperBorderPainter(
-                        corners: _paperCorners!,
-                        cameraImageSize: _cameraImageSize!,
-                        rotateClockwise: true,
-                        offsetAdjustmentX: offsetAdjustmentX,
-                        offsetAdjustmentY: offsetAdjustmentY,
+                builder: (context, constraints) {
+                  return Stack(
+                    alignment: Alignment.topCenter,
+                    children: [
+                      SizedBox(
+                        width: constraints.maxWidth,
+                        height: constraints.maxHeight,
+                        child: AspectRatio(
+                          aspectRatio: _controller.value.aspectRatio,
+                          child: CameraPreview(_controller),
+                        ),
                       ),
-                    ),
-                ],
-              ),
-            );
-          },
-        )
+                      //CameraPreview(_controller),
+                      if (_paperCorners != null && _cameraImageSize != null)
+                        SizedBox(
+                          width: constraints.maxWidth,
+                          height: constraints.maxHeight,
+                          child: AspectRatio(
+                            aspectRatio: _controller.value.aspectRatio,
+                            child: CustomPaint(
+                              //size: Size(constraints.maxWidth, constraints.maxHeight),
+                              painter: PaperBorderPainter(
+                                corners: _paperCorners!,
+                                cameraImageSize: _cameraImageSize!,
+                                rotateClockwise: true,
+                                offsetAdjustmentX: offsetAdjustmentX,
+                                offsetAdjustmentY: offsetAdjustmentY,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              )
             : LoadingScreen(),
       ),
     );
@@ -491,7 +514,8 @@ Uint8List convertYUV420ToPNGFromMap(Map<String, dynamic> params) {
         double uVal = u.toDouble() - 128.0;
         double vVal = v.toDouble() - 128.0;
         int r = (yVal + 1.402 * vVal).round().clamp(0, 255);
-        int g = (yVal - 0.344136 * uVal - 0.714136 * vVal).round().clamp(0, 255);
+        int g =
+            (yVal - 0.344136 * uVal - 0.714136 * vVal).round().clamp(0, 255);
         int b = (yVal + 1.772 * uVal).round().clamp(0, 255);
         rgbImage.setPixelRgba(x, y, r, g, b, 255);
       }
@@ -518,14 +542,16 @@ Uint8List convertYUV420ToPNGFromMap(Map<String, dynamic> params) {
         double uVal = up.toDouble() - 128.0;
         double vVal = vp.toDouble() - 128.0;
         int r = (yVal + 1.402 * vVal).round().clamp(0, 255);
-        int g = (yVal - 0.344136 * uVal - 0.714136 * vVal).round().clamp(0, 255);
+        int g =
+            (yVal - 0.344136 * uVal - 0.714136 * vVal).round().clamp(0, 255);
         int b = (yVal + 1.772 * uVal).round().clamp(0, 255);
         rgbImage.setPixelRgba(x, y, r, g, b, 255);
       }
     }
     return Uint8List.fromList(img.encodePng(rgbImage));
   } else {
-    throw Exception("Неподдерживаемый формат камеры: ожидается 1 (BGRA), 2 (NV12) или 3 (YUV420) плоскости.");
+    throw Exception(
+        "Неподдерживаемый формат камеры: ожидается 1 (BGRA), 2 (NV12) или 3 (YUV420) плоскости.");
   }
 }
 
@@ -664,7 +690,7 @@ Future<Uint8List> cropFrameInIsolate(Map<String, dynamic> params) async {
     // Исходные данные
     Uint8List pngBytes = params['pngBytes'];
     List<dynamic> cornersDynamic = params[
-    'corners']; // Ожидается список вида [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
+        'corners']; // Ожидается список вида [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
 
     // Декодируем исходное изображение в cv.Mat в цветном режиме
     cv.Mat mat = cv.imdecode(pngBytes, cv.IMREAD_COLOR);
@@ -768,7 +794,6 @@ Future<Uint8List> cropFrameInIsolate(Map<String, dynamic> params) async {
     return Uint8List(0);
   }
 }
-
 
 // Функция для преобразования List<List<double>> в List<Point>
 List<cv.Point> convertToPointList(List<List<double>> list) {
