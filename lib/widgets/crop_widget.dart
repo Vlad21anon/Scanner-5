@@ -4,6 +4,7 @@ import 'package:defer_pointer/defer_pointer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image/image.dart' as img;
+import 'package:owl_tech_pdf_scaner/app/app_text_style.dart';
 import 'package:owl_tech_pdf_scaner/models/scan_file.dart';
 import 'package:owl_tech_pdf_scaner/widgets/resizable_note.dart'; // если используется
 import '../app/app_colors.dart';
@@ -14,7 +15,7 @@ import '../app/app_colors.dart';
 class MultiPageCropWidget extends StatefulWidget {
   final ScanFile file; // Передаётся объект с списком страниц
 
-  const MultiPageCropWidget({Key? key, required this.file}) : super(key: key);
+  const MultiPageCropWidget({super.key, required this.file});
 
   @override
   State<MultiPageCropWidget> createState() => MultiPageCropWidgetState();
@@ -23,6 +24,7 @@ class MultiPageCropWidget extends StatefulWidget {
 class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
   // Индекс текущей страницы
   int _currentPageIndex = 0;
+
   // Контроллер для PageView (вертикальная прокрутка)
   late PageController _pageController;
 
@@ -47,7 +49,10 @@ class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
 
   _HandlePosition? _draggingHandle;
   Offset _initialDragOffset = Offset.zero;
-  late Offset _initialTopLeft, _initialTopRight, _initialBottomLeft, _initialBottomRight;
+  late Offset _initialTopLeft,
+      _initialTopRight,
+      _initialBottomLeft,
+      _initialBottomRight;
 
   // Размер контейнера (рабочей области)
   Size _containerSize = Size.zero;
@@ -164,6 +169,7 @@ class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
       final dy = (screenOffset.dy - offsetY) / scale;
       return Offset(dx, dy);
     }
+
     final p1 = toImageCoords(_topLeft);
     final p2 = toImageCoords(_topRight);
     final p3 = toImageCoords(_bottomLeft);
@@ -234,8 +240,11 @@ class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
             ),
             child: LayoutBuilder(
               builder: (ctx, innerConstraints) {
-                _containerSize = Size(innerConstraints.maxWidth, innerConstraints.maxHeight);
-                if (!_initializedHandles && _imageWidth != 0 && _imageHeight != 0) {
+                _containerSize =
+                    Size(innerConstraints.maxWidth, innerConstraints.maxHeight);
+                if (!_initializedHandles &&
+                    _imageWidth != 0 &&
+                    _imageHeight != 0) {
                   final imageRect = _getImageRect(_containerSize);
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     setState(() {
@@ -302,7 +311,8 @@ class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
         pos == _HandlePosition.bottomLeft ||
         pos == _HandlePosition.bottomRight) {
       type = HandleType.corner;
-    } else if (pos == _HandlePosition.topCenter || pos == _HandlePosition.bottomCenter) {
+    } else if (pos == _HandlePosition.topCenter ||
+        pos == _HandlePosition.bottomCenter) {
       type = HandleType.horizontal;
     } else {
       type = HandleType.vertical;
@@ -401,13 +411,17 @@ class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
       case _HandlePosition.bottomRight:
         return _bottomRight;
       case _HandlePosition.topCenter:
-        return Offset((_topLeft.dx + _topRight.dx) / 2, (_topLeft.dy + _topRight.dy) / 2);
+        return Offset(
+            (_topLeft.dx + _topRight.dx) / 2, (_topLeft.dy + _topRight.dy) / 2);
       case _HandlePosition.bottomCenter:
-        return Offset((_bottomLeft.dx + _bottomRight.dx) / 2, (_bottomLeft.dy + _bottomRight.dy) / 2);
+        return Offset((_bottomLeft.dx + _bottomRight.dx) / 2,
+            (_bottomLeft.dy + _bottomRight.dy) / 2);
       case _HandlePosition.leftCenter:
-        return Offset((_topLeft.dx + _bottomLeft.dx) / 2, (_topLeft.dy + _bottomLeft.dy) / 2);
+        return Offset((_topLeft.dx + _bottomLeft.dx) / 2,
+            (_topLeft.dy + _bottomLeft.dy) / 2);
       case _HandlePosition.rightCenter:
-        return Offset((_topRight.dx + _bottomRight.dx) / 2, (_topRight.dy + _bottomRight.dy) / 2);
+        return Offset((_topRight.dx + _bottomRight.dx) / 2,
+            (_topRight.dy + _bottomRight.dy) / 2);
     }
   }
 
@@ -469,24 +483,43 @@ class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
       return _buildCropUI(widget.file.pages.first);
     }
 
-    // Если многостраничный режим: PageView с вертикальной прокруткой
-    return PageView.builder(
-      controller: _pageController,
-      scrollDirection: Axis.vertical,
-      itemCount: widget.file.pages.length,
-      onPageChanged: (newPage) async {
-        await _onPageChanged(newPage);
-      },
-      itemBuilder: (context, index) {
-        // Если текущая страница отличается от index,
-        // можно показать либо состояние "загружается" (если !_initializedHandles)
-        // либо саму crop-область для этой страницы.
-        // Здесь для простоты всегда вызываем _buildCropUI для страницы по индексу.
-        // При переключении состояние пересчитывается (_initializedHandles сброшен).
-        return _buildCropUI(widget.file.pages[index]);
-      },
+    return Stack(
+      children: [
+        // Основной виджет PageView
+        PageView.builder(
+          controller: _pageController,
+          scrollDirection: Axis.vertical,
+          itemCount: widget.file.pages.length,
+          onPageChanged: (newPage) async {
+            await _onPageChanged(newPage);
+          },
+          itemBuilder: (context, index) {
+            return _buildCropUI(widget.file.pages[index]);
+          },
+        ),
+        // Отображение номера текущей страницы внизу
+        Positioned(
+          bottom: 90.h, // отступ от нижнего края (можно регулировать)
+          left: 0,
+          right: 0,
+          child: Center(
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12.r),
+              ),
+              child: Text(
+                "${_currentPageIndex + 1} / ${widget.file.pages.length}",
+                style: AppTextStyle.exo20,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
+
 }
 
 /// Перечисление позиций ручек

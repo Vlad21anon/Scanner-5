@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:owl_tech_pdf_scaner/main.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../app/app_colors.dart';
 import '../app/app_icons.dart';
@@ -25,6 +26,13 @@ class _SubscriptionSelectionScreenState
     extends State<SubscriptionSelectionScreen> {
   SelectedSubType selectedSub = SelectedSubType.year;
   final navigator = NavigationService();
+
+  Future<void> _openUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      throw Exception('Не удалось открыть $url');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -110,7 +118,10 @@ class _SubscriptionSelectionScreenState
                   ),
                 ),
                 TextButton(
-                  onPressed: () {},
+                  onPressed: () async {
+                    // Переход на страницу условий использования
+                    await _openUrl('https://pdf-scanner.lovable.app/terms');
+                  },
                   child: Text(
                     'Terms',
                     style: AppTextStyle.exo16.copyWith(
@@ -120,7 +131,10 @@ class _SubscriptionSelectionScreenState
                   ),
                 ),
                 TextButton(
-                  onPressed: () {},
+                  onPressed: () async {
+                    // Переход на страницу политики конфиденциальности
+                    await _openUrl('https://pdf-scanner.lovable.app/privacy');
+                  },
                   child: Text(
                     'Privacy',
                     style: AppTextStyle.exo16.copyWith(
