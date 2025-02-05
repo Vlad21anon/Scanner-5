@@ -6,7 +6,7 @@ class AppShadows {
   static BoxShadow grey03b3r1o00 = BoxShadow(
     color: Colors.grey.withValues(alpha: 0.3),
     spreadRadius: 1,
-    blurRadius: 3,
-    offset: const Offset(0, 0),
+    blurRadius: 4,
+    offset: const Offset(0, 4),
   );
 }

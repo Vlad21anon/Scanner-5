@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../app/app_colors.dart';
-import '../app/app_shadows.dart';
 
 class CustomCircularButton extends StatelessWidget {
   final Color? color;
@@ -22,25 +21,28 @@ class CustomCircularButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 54.w,
-        height: 54.w,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: color ?? AppColors.white,
-          boxShadow: [
-            if (withShadow) AppShadows.grey03b3r1o00,
-          ],
-          border: withBorder
-              ? Border.all(width: 2.w, color: AppColors.greyIcon)
+    return Material(
+      color: color ?? AppColors.white,
+      shape: const CircleBorder(),
+      elevation: withShadow ? 4.0 : 0.0,
+      shadowColor: Colors.grey.withValues(alpha: 0.3),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: Container(
+          width: 54.w,
+          height: 54.w,
+          decoration: withBorder
+              ? BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(width: 2.w, color: AppColors.greyIcon),
+          )
               : null,
-        ),
-        child: Center(
-          child: FittedBox(
-            fit: BoxFit.none, // не масштабировать дочерний элемент
-            child: child,
+          child: Center(
+            child: FittedBox(
+              fit: BoxFit.none, // не масштабировать дочерний элемент
+              child: child,
+            ),
           ),
         ),
       ),
