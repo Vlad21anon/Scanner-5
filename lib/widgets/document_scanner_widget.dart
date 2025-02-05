@@ -263,30 +263,38 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
   }
 
   Future<String?> cropImage() async {
-    if (_lastPngBytes == null ||
-        _paperCorners == null ||
-        _paperCorners!.length != 4) {
+    // Проверяем, что есть изображение для сохранения
+    if (_lastPngBytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Нет корректного контура для обрезки')),
+        const SnackBar(content: Text('Нет изображения для сохранения')),
       );
       return null;
     }
 
-    final croppedBytes = await compute(cropFrameInIsolate, {
-      'pngBytes': _lastPngBytes,
-      'corners': _paperCorners!.map((pt) => [pt.dx, pt.dy]).toList(),
-      'width': _cameraImageSize!.width.toInt(),
-      'height': _cameraImageSize!.height.toInt(),
-    });
+    List<int> imageBytes;
 
-    if (croppedBytes.isNotEmpty) {
+    // Если есть корректный контур (4 угла), выполняем обрезку в отдельном isolate
+    if (_paperCorners != null && _paperCorners!.length == 4) {
+      imageBytes = await compute(cropFrameInIsolate, {
+        'pngBytes': _lastPngBytes,
+        'corners': _paperCorners!.map((pt) => [pt.dx, pt.dy]).toList(),
+        'width': _cameraImageSize!.width.toInt(),
+        'height': _cameraImageSize!.height.toInt(),
+      });
+    } else {
+      // Если углов не 4, сохраняем изображение как есть без обрезки
+      imageBytes = _lastPngBytes!;
+    }
+
+    // Если полученные байты не пустые, сохраняем файл
+    if (imageBytes.isNotEmpty) {
       try {
         final Directory appDocDir = await getApplicationDocumentsDirectory();
         final String fileName =
             "cropped_${DateTime.now().millisecondsSinceEpoch}.png";
         final String filePath = path.join(appDocDir.path, fileName);
         final File file = File(filePath);
-        await file.writeAsBytes(croppedBytes);
+        await file.writeAsBytes(imageBytes);
 
         if (mounted) {
           setState(() {
@@ -301,6 +309,7 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
     }
     return null;
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -502,27 +511,32 @@ Future<Uint8List> cropFrameInIsolate(Map<String, dynamic> params) async {
   try {
     // Исходные данные
     Uint8List pngBytes = params['pngBytes'];
-    List<dynamic> cornersDynamic = params[
-        'corners']; // Ожидается список вида [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
-
+    List<dynamic> cornersDynamic = params['corners'];
     // Декодируем исходное изображение в cv.Mat в цветном режиме
     cv.Mat mat = cv.imdecode(pngBytes, cv.IMREAD_COLOR);
     debugPrint(
         "Исходное изображение: ширина = ${mat.width}, высота = ${mat.height}, channels = ${mat.channels}");
 
-    // Преобразуем список углов в список Point2f
-    List<cv.Point2f> srcPoints = cornersDynamic
-        .map<cv.Point2f>(
-            (item) => cv.Point2f(item[0].toDouble(), item[1].toDouble()))
-        .toList();
-    if (srcPoints.length != 4) {
-      throw Exception('Ожидается ровно 4 точки для обрезки');
+    // Если передано ровно 4 точки, используем их, иначе создаём список, охватывающий всё изображение.
+    List<cv.Point2f> srcPoints;
+    if (cornersDynamic.length == 4) {
+      srcPoints = cornersDynamic
+          .map<cv.Point2f>(
+              (item) => cv.Point2f(item[0].toDouble(), item[1].toDouble()))
+          .toList();
+    } else {
+      debugPrint("Количество точек не равно 4, используем углы всего изображения.");
+      srcPoints = [
+        cv.Point2f(0, 0),
+        cv.Point2f(mat.width.toDouble(), 0),
+        cv.Point2f(mat.width.toDouble(), mat.height.toDouble()),
+        cv.Point2f(0, mat.height.toDouble()),
+      ];
     }
 
     // Упорядочиваем точки в порядке: верхний левый, верхний правый, нижний правый, нижний левый
     List<cv.Point2f> orderedPoints = orderPoints(srcPoints);
-    debugPrint(
-        "Упорядоченные точки: ${orderedPoints.map((pt) => "(${pt.x}, ${pt.y})").join(', ')}");
+    debugPrint("Упорядоченные точки: ${orderedPoints.map((pt) => "(${pt.x}, ${pt.y})").join(', ')}");
 
     // Вычисляем ширину итогового изображения как максимум из расстояний между верхними и нижними сторонами:
     double widthTop = math.sqrt(
@@ -542,8 +556,7 @@ Future<Uint8List> cropFrameInIsolate(Map<String, dynamic> params) async {
             math.pow(orderedPoints[2].y - orderedPoints[1].y, 2));
     double maxHeight = math.max(heightLeft, heightRight);
 
-    debugPrint(
-        "Вычисленные размеры итогового изображения: maxWidth = $maxWidth, maxHeight = $maxHeight");
+    debugPrint("Вычисленные размеры итогового изображения: maxWidth = $maxWidth, maxHeight = $maxHeight");
 
     // Определяем целевые точки для перспективного преобразования
     List<cv.Point2f> dstPoints = [
@@ -565,20 +578,24 @@ Future<Uint8List> cropFrameInIsolate(Map<String, dynamic> params) async {
       perspectiveMatrix,
       (maxWidth.toInt(), maxHeight.toInt()),
     );
-    debugPrint(
-        "Изображение после warpPerspective: ширина = ${warped.width}, высота = ${warped.height}, channels = ${warped.channels}");
+    debugPrint("Изображение после warpPerspective: ширина = ${warped.width}, высота = ${warped.height}, channels = ${warped.channels}");
+
+    // Освобождаем ненужные ресурсы
+    perspectiveMatrix.dispose();
+    srcVec.dispose();
+    dstVec.dispose();
+    mat.dispose(); // исходный mat больше не нужен
 
     // Преобразуем цветовое пространство из BGR (стандарт OpenCV) в RGB
     cv.Mat rgbMat = cv.cvtColor(warped, cv.COLOR_BGR2RGB);
     debugPrint("Изображение после cvtColor: channels = ${rgbMat.channels}");
 
     // Если не iOS, поворачиваем изображение вправо (на 90° по часовой стрелке);
-    // для iOS сохраняем исходное изображение.
+    // для iOS оставляем исходное изображение.
     cv.Mat finalMat;
     if (!Platform.isIOS) {
       finalMat = cv.rotate(rgbMat, cv.ROTATE_90_CLOCKWISE);
-      debugPrint(
-          "Изображение повернуто: ширина = ${finalMat.width}, высота = ${finalMat.height}");
+      debugPrint("Изображение повернуто: ширина = ${finalMat.width}, высота = ${finalMat.height}");
       rgbMat.dispose();
     } else {
       finalMat = rgbMat;
@@ -590,23 +607,19 @@ Future<Uint8List> cropFrameInIsolate(Map<String, dynamic> params) async {
       throw Exception("Ошибка при кодировании изображения в PNG");
     }
     Uint8List croppedPng = result.$2;
-    debugPrint(
-        "Размер обрезанного изображения (PNG): ${croppedPng.lengthInBytes} байт");
+    debugPrint("Размер итогового изображения (PNG): ${croppedPng.lengthInBytes} байт");
 
     // Освобождаем ресурсы
-    mat.dispose();
-    perspectiveMatrix.dispose();
     warped.dispose();
     finalMat.dispose();
-    srcVec.dispose();
-    dstVec.dispose();
 
     return croppedPng;
   } catch (e) {
-    debugPrint("Ошибка при обрезке: $e");
+    debugPrint("Ошибка при обработке изображения: $e");
     return Uint8List(0);
   }
 }
+
 
 // Функция для преобразования List<List<double>> в List<Point>
 List<cv.Point> convertToPointList(List<List<double>> list) {

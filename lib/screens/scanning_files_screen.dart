@@ -44,6 +44,7 @@ class ScanningFilesScreen extends StatelessWidget {
               ],
             ),
           ),
+          SizedBox(height: 26.h),
           // Список страниц выбранного файла
           Expanded(
             child: ListView.separated(
