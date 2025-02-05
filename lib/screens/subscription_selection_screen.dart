@@ -131,11 +131,15 @@ class _SubscriptionSelectionScreenState
                 ),
                 TextButton(
                   onPressed: () {
-                    navigator.navigateTo(
-                      context,
-                      MainScreen(),
-                      replace: true,
-                    );
+                    if (Navigator.canPop(context)) {
+                      navigator.pop(context);
+                    } else {
+                      navigator.navigateTo(
+                        context,
+                        MainScreen(),
+                        replace: true,
+                      );
+                    }
                   },
                   child: Text(
                     'Not now',

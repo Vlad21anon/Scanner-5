@@ -156,12 +156,6 @@ class _ScanScreenState extends State<ScanScreen> {
   }
 
   @override
-  void dispose() {
-    context.read<FilesCubit>().lastScanFile = null;
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
@@ -282,6 +276,7 @@ class _ScanScreenState extends State<ScanScreen> {
               withShadow: false,
               color: AppColors.black.withValues(alpha: 0.6),
               onTap: () {
+                context.read<FilesCubit>().lastScanFile = null;
                 navigation.pop(context);
               },
               child: AppIcons.arrowLeftWhite14x14,

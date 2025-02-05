@@ -5,7 +5,6 @@ import 'package:owl_tech_pdf_scaner/app/app_icons.dart';
 import 'package:owl_tech_pdf_scaner/app/app_text_style.dart';
 import 'package:owl_tech_pdf_scaner/gen/assets.gen.dart';
 import 'package:owl_tech_pdf_scaner/models/scan_file.dart';
-import 'package:owl_tech_pdf_scaner/screens/onboarding_screen.dart';
 import 'package:owl_tech_pdf_scaner/screens/pdf_edit_screen.dart';
 import 'package:owl_tech_pdf_scaner/services/navigation_service.dart';
 
@@ -14,7 +13,6 @@ import '../blocs/filter_cubit.dart';
 import '../widgets/custom_circular_button.dart';
 import '../widgets/file_card.dart';
 import '../widgets/filter_popup.dart';
-import 'document_scanner_test.dart';
 
 class FilesPage extends StatefulWidget {
   const FilesPage({super.key});
@@ -100,20 +98,20 @@ class _FilesPageState extends State<FilesPage> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                ElevatedButton(
-                                  onPressed: () {
-                                    navigation.navigateTo(
-                                        context, DocumentScannerTest());
-                                  },
-                                  child: Text('DocumentScannerTest'),
-                                ),
-                                ElevatedButton(
-                                  onPressed: () {
-                                    navigation.navigateTo(
-                                        context, OnboardingScreen());
-                                  },
-                                  child: Text('OnboardingScreen'),
-                                ),
+                                // ElevatedButton(
+                                //   onPressed: () {
+                                //     navigation.navigateTo(
+                                //         context, DocumentScannerTest());
+                                //   },
+                                //   child: Text('DocumentScannerTest'),
+                                // ),
+                                // ElevatedButton(
+                                //   onPressed: () {
+                                //     navigation.navigateTo(
+                                //         context, OnboardingScreen());
+                                //   },
+                                //   child: Text('OnboardingScreen'),
+                                // ),
                                 Assets.images.imagePhotoroom2
                                     .image(width: 261.w, height: 217.h),
                                 SizedBox(height: 8.h),

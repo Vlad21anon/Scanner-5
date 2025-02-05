@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:owl_tech_pdf_scaner/app/app_icons.dart';
 import 'package:owl_tech_pdf_scaner/models/scan_file.dart';
+import 'package:owl_tech_pdf_scaner/screens/subscription_selection_screen.dart';
 import '../app/app_colors.dart';
 import '../app/app_text_style.dart';
 import '../blocs/files_cubit.dart';
@@ -26,20 +27,24 @@ class PdfEditScreen extends StatefulWidget {
 class _PdfEditScreenState extends State<PdfEditScreen> {
   int _selectedIndex = 0;
   int _oldIndex = 0;
+
   // Флаг подписки пользователя (можно заменить логикой проверки подписки)
-  bool _hasSubscription = false;
-  late int _penModeCount; // Счётчик использования режима Pen
+  bool _hasSubscription = true;
+  bool _isShareSelected = false;
 
   // Глобальные ключи для вызова функций сохранения в каждом режиме
-  final GlobalKey<MultiPageCropWidgetState> _cropKey = GlobalKey<MultiPageCropWidgetState>();
-  final GlobalKey<TextEditWidgetState> _textKey = GlobalKey<TextEditWidgetState>();
+  final GlobalKey<MultiPageCropWidgetState> _cropKey =
+      GlobalKey<MultiPageCropWidgetState>();
+  final GlobalKey<TextEditWidgetState> _textKey =
+      GlobalKey<TextEditWidgetState>();
   final GlobalKey<PenEditWidgetState> _penKey = GlobalKey<PenEditWidgetState>();
+
+  final navigation = NavigationService();
 
   late List<Widget> _pages = [];
 
   @override
   void initState() {
-    _penModeCount = 0;
     _pages = [
       // 0. Режим обрезки
       MultiPageCropWidget(
@@ -62,56 +67,30 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
     super.initState();
   }
 
-  Future<bool?> _showSubscriptionDialogOrShare() async {
-    final bool isSubscriptionHave = true;
-
-    if (isSubscriptionHave) {
-      await _sharePdfFile();
+  Future<bool> _showSubscriptionDialogOrShare() async {
+    // Если у пользователя уже есть подписка – разрешаем использовать режим Pen
+    if (_hasSubscription) {
+      return true;
+    } else {
+      // Если подписки нет, показываем диалог для выбора: подписаться или поделиться
+      navigation.navigateTo(context, SubscriptionSelectionScreen());
       return false;
     }
-
-    return showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text("Ограничение доступа"),
-          content: const Text(
-              "Для продолжения использования режима Pen подпишитесь или поделитесь файлом в формате PDF."),
-          actions: [
-            TextButton(
-              onPressed: () {
-                // Здесь можно добавить логику подписки.
-                Navigator.of(context).pop(true);
-              },
-              child: const Text("Подписаться"),
-            ),
-            TextButton(
-              onPressed: () async {
-                await _sharePdfFile();
-                Navigator.of(context).pop(true);
-              },
-              child: const Text("Поделиться"),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(false);
-              },
-              child: const Text("Отмена"),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   /// Функция для создания PDF-файла из аннотированного изображения и его шаринга
   Future<void> _sharePdfFile() async {
+    setState(() {
+      _isShareSelected = true;
+    });
     try {
-      //await FileShareService.shareImageAsPdf(widget.file.path, text: 'Ваш PDF файл');
-
+      await FileShareService.shareFileAsPdf(widget.file, text: 'Ваш PDF файл');
     } catch (e) {
       debugPrint("Ошибка при создании или шаринге PDF: $e");
     }
+    setState(() {
+      _isShareSelected = false;
+    });
   }
 
   /// Обработчик изменения выбранного пункта меню.
@@ -123,37 +102,26 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
       await _cropKey.currentState?.saveCrop();
       _textKey.currentState?.updateImage(UniqueKey());
       _penKey.currentState?.updateImage(UniqueKey());
-      setState(() {});
     }
     if (_oldIndex == 1 && newIndex != 1) {
       await _textKey.currentState?.saveTextInImage();
       _penKey.currentState?.updateImage(UniqueKey());
       _cropKey.currentState?.updateImage(UniqueKey());
-      setState(() {});
     }
     if (_oldIndex == 2 && newIndex != 2) {
       await _penKey.currentState?.saveAnnotatedImage();
       _textKey.currentState?.updateImage(UniqueKey());
       _cropKey.currentState?.updateImage(UniqueKey());
-      setState(() {});
     }
 
-    // Если выбран режим Pen
-    if (newIndex == 2) {
-      _penModeCount++;
-
-      if (_penModeCount > 1 && !_hasSubscription) {
-        _penModeCount = 0;
-        await _penKey.currentState?.saveAnnotatedImage();
-        setState(() {});
-        bool? allowed = await _showSubscriptionDialogOrShare();
-        if (allowed != true) {
-          return; // Не обновляем состояние, остаёмся в предыдущем режиме
-        }
+    if (_oldIndex == 2 && newIndex == 2) {
+      final state = await _showSubscriptionDialogOrShare();
+      if (state == true) {
+        _sharePdfFile();
       }
     }
 
-    // Обновляем состояние экрана
+    // Просто обновляем выбранный индекс, без проверки подписки
     setState(() {
       _selectedIndex = newIndex;
       _oldIndex = newIndex;
@@ -164,6 +132,20 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
   void didChangeDependencies() {
     context.read<FilesCubit>().lastScanFile = null;
     super.didChangeDependencies();
+  }
+
+  /// Функция для выбора заголовка экрана в зависимости от выбранного режима и флага share.
+  String _getTitle() {
+    switch (_selectedIndex) {
+      case 0:
+        return 'Crop';
+      case 1:
+        return 'Add Text';
+      case 2:
+        return _isShareSelected ? 'Share' : 'Sign';
+      default:
+        return '';
+    }
   }
 
   @override
@@ -190,15 +172,18 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
                       },
                       child: AppIcons.arrowLeftBlack22x18,
                     ),
-                    Text('Crop', style: AppTextStyle.nunito32),
+                    Text(
+                      _getTitle(),
+                      style: AppTextStyle.nunito32,
+                    ),
                     CustomCircularButton(
                       onTap: () async {
-                        bool? allowed = await _showSubscriptionDialogOrShare();
-                        if (allowed != true) {
-                          return; // Не обновляем состояние, остаёмся в предыдущем режиме
+                        final state = await _showSubscriptionDialogOrShare();
+                        if (state == true) {
+                          _sharePdfFile();
                         }
                       },
-                      child:AppIcons.share19x22,
+                      child: AppIcons.share19x22,
                     ),
                   ],
                 ),
