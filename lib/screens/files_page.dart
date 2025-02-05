@@ -9,7 +9,7 @@ import 'package:owl_tech_pdf_scaner/screens/onboarding_screen.dart';
 import 'package:owl_tech_pdf_scaner/screens/pdf_edit_screen.dart';
 import 'package:owl_tech_pdf_scaner/services/navigation_service.dart';
 
-import '../blocs/files_cubit/files_cubit.dart';
+import '../blocs/files_cubit.dart';
 import '../blocs/filter_cubit.dart';
 import '../widgets/custom_circular_button.dart';
 import '../widgets/file_card.dart';

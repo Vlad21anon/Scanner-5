@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
 import 'package:owl_tech_pdf_scaner/app/app_text_style.dart';
-import 'package:owl_tech_pdf_scaner/widgets/%D1%81ustom_slider.dart';
+import 'package:owl_tech_pdf_scaner/widgets/сustom_slider.dart';
 import 'editable_movable_text.dart';
 import '../models/scan_file.dart';
 
@@ -18,10 +18,11 @@ class TextEditWidget extends StatefulWidget {
 }
 
 class TextEditWidgetState extends State<TextEditWidget> {
+  // Общие параметры для наложения текста (по умолчанию для первой страницы)
   String _text = '';
   Color _textColor = Colors.black;
   double _fontSize = 16.sp;
-  Offset _textOffset =  Offset(100.w, 100.h);
+  Offset _textOffset = Offset(100.w, 100.h);
   bool isEditMode = false;
   LocalKey imageKey = UniqueKey();
   final GlobalKey<EditableMovableResizableTextState> textEditKey = GlobalKey();
@@ -30,73 +31,167 @@ class TextEditWidgetState extends State<TextEditWidget> {
   double textShiftX = 0;
   double textShiftY = 0;
 
+  // Для многостраничного режима:
+  int _currentPageIndex = 0;
+  late PageController _pageController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: 0);
+  }
+
   void updateImage(LocalKey key) {
     setState(() {
       imageKey = key;
     });
   }
 
-  double getInitialChildSize(BuildContext context, bool addPenMode) {
+  double getInitialChildSize(BuildContext context, bool editMode) {
     final screenHeight = MediaQuery.of(context).size.height;
-    // Если высота экрана больше (например, iPhone 14), используем "больше" значения
     if (screenHeight >= 800) {
-      return addPenMode ? 0.8 : 0.45;
+      return editMode ? 0.8 : 0.45;
     } else {
-      // Для маленьких экранов (например, iPhone 7) немного уменьшаем размеры
-      return addPenMode ? 0.82 : 0.50;
+      return editMode ? 0.82 : 0.50;
     }
   }
 
-  double getMinChildSize(BuildContext context, bool addPenMode) {
+  double getMinChildSize(BuildContext context, bool editMode) {
     final screenHeight = MediaQuery.of(context).size.height;
     if (screenHeight >= 800) {
-      return addPenMode ? 0.8 : 0.1;
+      return editMode ? 0.8 : 0.1;
     } else {
-      return addPenMode ? 0.82 : 0.1;
+      return editMode ? 0.82 : 0.1;
     }
   }
 
-  double getMaxChildSize(BuildContext context, bool addPenMode) {
+  double getMaxChildSize(BuildContext context, bool editMode) {
     final screenHeight = MediaQuery.of(context).size.height;
     if (screenHeight >= 800) {
-      return addPenMode ? 0.8 : 0.45;
+      return editMode ? 0.8 : 0.45;
     } else {
-      return addPenMode ? 0.82 : 0.50;
+      return editMode ? 0.82 : 0.50;
     }
+  }
+
+  /// Сохраняем наложенный текст для текущей страницы.
+  /// Используется текущий путь из widget.file.pages[_currentPageIndex]
+  Future<void> saveTextInImage() async {
+    final pagePath = widget.file.pages[_currentPageIndex];
+    if (pagePath.isEmpty || _text.isEmpty || _text == 'Tap to edit') return;
+    final file = File(pagePath);
+    if (!await file.exists()) return;
+    try {
+      final fileBytes = await file.readAsBytes();
+      final ui.Codec codec = await ui.instantiateImageCodec(fileBytes);
+      final ui.FrameInfo frameInfo = await codec.getNextFrame();
+      final ui.Image originalImage = frameInfo.image;
+      final int originalWidth = originalImage.width;
+      final int originalHeight = originalImage.height;
+      // Предполагаемые размеры контейнера (как в макете)
+      final double displayedWidth = 361.w;
+      final double displayedHeight = 491.h;
+      final double scaleX = originalWidth / displayedWidth;
+      final double scaleY = originalHeight / displayedHeight;
+      final ui.PictureRecorder recorder = ui.PictureRecorder();
+      final Canvas canvas = Canvas(recorder);
+      canvas.drawImage(originalImage, Offset.zero, Paint());
+      final double drawX = _textOffset.dx * scaleX;
+      final double drawY = _textOffset.dy * scaleY;
+      final textSpan = TextSpan(
+        text: _text,
+        style: TextStyle(fontSize: _fontSize * scaleX, color: _textColor),
+      );
+      final textPainter = TextPainter(
+        text: textSpan,
+        textDirection: TextDirection.ltr,
+      );
+      textPainter.layout(maxWidth: displayedWidth * scaleX);
+      textPainter.paint(canvas, Offset(drawX, drawY));
+      final ui.Picture picture = recorder.endRecording();
+      final ui.Image finalImage = await picture.toImage(originalWidth, originalHeight);
+      final ByteData? finalByteData = await finalImage.toByteData(format: ui.ImageByteFormat.png);
+      if (finalByteData == null) return;
+      final Uint8List finalBytes = finalByteData.buffer.asUint8List();
+      await file.writeAsBytes(finalBytes);
+      imageCache.clear();
+      imageCache.clearLiveImages();
+      setState(() {
+        imageKey = UniqueKey();
+      });
+    } catch (e) {
+      debugPrint('Ошибка при сохранении изображения с текстом: $e');
+    }
+  }
+
+  /// Строит область редактирования для конкретной страницы.
+  /// Если файл многостраничный, для каждой страницы используется соответствующий путь из widget.file.pages.
+  Widget _buildTextAnnotationUI(String pagePath) {
+    return Align(
+      alignment: Alignment.topCenter,
+      child: Padding(
+        padding: EdgeInsets.only(top: 24.h),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final double containerWidth = 361.w;
+            final double containerHeight = 491.h;
+            return SizedBox(
+              width: containerWidth,
+              height: containerHeight,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12.r),
+                child: Image.file(
+                  File(pagePath),
+                  key: imageKey,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  /// При смене страницы в многостраничном режиме:
+  /// 1. Сохраняем изменения для текущей страницы (наложенный текст).
+  /// 2. Сбрасываем состояние (если требуется) и обновляем индекс.
+  Future<void> _onPageChanged(int newPage) async {
+    await saveTextInImage();
+    setState(() {
+      _currentPageIndex = newPage;
+      // При необходимости можно сбрасывать текст и положение для новой страницы:
+      _text = '';
+      _textOffset = Offset(100.w, 100.h);
+      isEditMode = false;
+      imageKey = UniqueKey();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    // Если многостраничный режим
+    final bool multiPage = widget.file.pages.length > 1;
     return Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: AppColors.background,
       body: SizedBox.expand(
         child: Stack(
           children: [
-            Align(
-              alignment: Alignment.topCenter,
-              child: Padding(
-                padding:  EdgeInsets.only(top: 24.h),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final double containerWidth = 361.w;
-                    final double containerHeight = 491.h;
-                    return SizedBox(
-                      width: containerWidth,
-                      height: containerHeight,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12.r),
-                        child: Image.file(
-                          File(widget.file.path),
-                          key: imageKey,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
+            // Если многостраничный режим – используем PageView
+            multiPage
+                ? PageView.builder(
+              controller: _pageController,
+              scrollDirection: Axis.vertical,
+              itemCount: widget.file.pages.length,
+              onPageChanged: _onPageChanged,
+              itemBuilder: (context, index) {
+                return _buildTextAnnotationUI(widget.file.pages[index]);
+              },
+            )
+            // Если одностраничный – отображаем обычное изображение
+                : _buildTextAnnotationUI(widget.file.pages.first),
+            // Панель с настройками (DraggableScrollableSheet)
             DraggableScrollableSheet(
               initialChildSize: getInitialChildSize(context, isEditMode),
               minChildSize: getMinChildSize(context, isEditMode),
@@ -109,7 +204,7 @@ class TextEditWidgetState extends State<TextEditWidget> {
                   ),
                   child: ListView(
                     controller: scrollController,
-                    padding:  EdgeInsets.all(16.r),
+                    padding: EdgeInsets.all(16.r),
                     children: [
                       Center(
                         child: Container(
@@ -121,9 +216,9 @@ class TextEditWidgetState extends State<TextEditWidget> {
                           ),
                         ),
                       ),
-                       SizedBox(height: 8.h),
+                      SizedBox(height: 8.h),
                       Text('Font Size', style: AppTextStyle.exo20),
-                       SizedBox(height: 16.h),
+                      SizedBox(height: 16.h),
                       Row(
                         children: [
                           Text('Small', style: AppTextStyle.exo16),
@@ -141,9 +236,9 @@ class TextEditWidgetState extends State<TextEditWidget> {
                           Text('Large', style: AppTextStyle.exo16),
                         ],
                       ),
-                       SizedBox(height: 24.h),
+                      SizedBox(height: 24.h),
                       Text('Color', style: AppTextStyle.exo20),
-                       SizedBox(height: 16.h),
+                      SizedBox(height: 16.h),
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
@@ -162,12 +257,13 @@ class TextEditWidgetState extends State<TextEditWidget> {
                           ],
                         ),
                       ),
-                       SizedBox(height: 16.h),
+                      SizedBox(height: 16.h),
                     ],
                   ),
                 );
               },
             ),
+            // Виджет редактируемого текста, поверх изображения
             Positioned.fill(
               child: EditableMovableResizableText(
                 initialPosition: _textOffset,
@@ -221,9 +317,14 @@ class TextEditWidgetState extends State<TextEditWidget> {
     );
   }
 
-  Future<void> saveTextInImage() async {
-    final path = widget.file.path;
-    if (path.isEmpty || _text == 'Tap to edit') return;
+  /// Метод для сохранения финального изображения с наложенным текстом.
+  /// Вызывается, например, перед выходом или по отдельной кнопке.
+  Future<void> saveFinalImage() async {
+    // Если многостраничный режим – сохраняем для текущей страницы.
+    final String path = widget.file.pages.length > 1
+        ? widget.file.pages[_currentPageIndex]
+        : widget.file.pages.first;
+    if (path.isEmpty || _text.isEmpty || _text == 'Tap to edit') return;
     final file = File(path);
     if (!await file.exists()) return;
     try {
@@ -258,8 +359,6 @@ class TextEditWidgetState extends State<TextEditWidget> {
       if (finalByteData == null) return;
       final Uint8List finalBytes = finalByteData.buffer.asUint8List();
       await file.writeAsBytes(finalBytes);
-      final FileImage fileImage = FileImage(File(path));
-      await fileImage.evict();
       imageCache.clear();
       imageCache.clearLiveImages();
       setState(() {

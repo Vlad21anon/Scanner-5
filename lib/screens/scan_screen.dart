@@ -1,18 +1,18 @@
 import 'dart:io';
-import 'package:camera/camera.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:intl/intl.dart';
 import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
 import 'package:owl_tech_pdf_scaner/app/app_icons.dart';
 import 'package:owl_tech_pdf_scaner/app/app_text_style.dart';
-import 'package:owl_tech_pdf_scaner/blocs/files_cubit/files_cubit.dart';
-import 'package:owl_tech_pdf_scaner/blocs/scan_files_cubit.dart';
+import 'package:owl_tech_pdf_scaner/blocs/files_cubit.dart';
 import 'package:owl_tech_pdf_scaner/models/scan_file.dart';
 import 'package:owl_tech_pdf_scaner/screens/pdf_edit_screen.dart';
 import 'package:owl_tech_pdf_scaner/screens/scanning_files_screen.dart';
 import 'package:owl_tech_pdf_scaner/services/navigation_service.dart';
+import 'package:uuid/uuid.dart';
 import '../gen/assets.gen.dart';
 import '../services/permission_service.dart';
 import '../widgets/custom_circular_button.dart';
@@ -27,12 +27,8 @@ class ScanScreen extends StatefulWidget {
 }
 
 class _ScanScreenState extends State<ScanScreen> {
-  /// Отвечает за использование режима мульти/одиночного фото
+  /// Режим мульти/одиночного фото
   bool isMultiPhoto = false;
-
-  /// Контроллер для камеры
-  late CameraController _cameraController;
-  Future<void>? _initializeControllerFuture;
 
   final navigation = NavigationService();
 
@@ -42,88 +38,117 @@ class _ScanScreenState extends State<ScanScreen> {
   @override
   void initState() {
     super.initState();
-    // Запрашиваем разрешения на камеру и микрофон при запуске экрана
+    // Запрашиваем разрешения на камеру и микрофон
     PermissionService().requestCameraAndMicrophonePermissions();
-    _initCamera();
   }
 
-  /// Метод для инициализации камеры
-  Future<void> _initCamera() async {
-    // Получаем список доступных камер
-    final cameras = await availableCameras();
-
-    // Для простоты берём первую доступную (обычно задняя камера)
-    final firstCamera = cameras.first;
-
-    // Создаём контроллер
-    _cameraController = CameraController(
-      firstCamera,
-      ResolutionPreset.medium,
-      enableAudio: false, // выключим аудио
-    );
-
-    // Инициализируем контроллер
-    _initializeControllerFuture = _cameraController.initialize();
-    setState(() {});
-  }
-
-  @override
-  void dispose() {
-    // Освобождаем ресурсы
-    _cameraController.dispose();
-    super.dispose();
-  }
-
-  /// Метод для ото
+  /// Обработка фотографии, снятой камерой
   Future<void> _takePhoto(BuildContext context) async {
-    final croppedPath =
-    await scannerKey.currentState?.cropImage();
-    if (croppedPath != null &&
-        croppedPath.isNotEmpty) {
-      // Добавляем файл через Cubit или другой механизм
-      context
-          .read<ScanFilesCubit>()
-          .addFile(croppedPath);
-      context.read<FilesCubit>().addFile(croppedPath);
+    final croppedPath = await scannerKey.currentState?.cropImage();
+    if (croppedPath != null && croppedPath.isNotEmpty) {
+      final file = File(croppedPath);
+      final bytes = file.lengthSync();
+      final sizeInMb = bytes / (1024 * 1024);
 
-      // Если одиночный режим — сразу уходим на экран сканирования
-      if (!isMultiPhoto) {
-        // Останавливаем работу сканера, чтобы камера не работала в фоне
+      final filesCubit = context.read<FilesCubit>();
+
+      if (isMultiPhoto) {
+        // Если уже есть активный файл для сканирования, обновляем его,
+        // иначе создаём новый файл и назначаем его как текущий
+        if (filesCubit.lastScanFile != null) {
+          final currentFile = filesCubit.lastScanFile!;
+          final updatedFile = currentFile.addPage(croppedPath, sizeInMb);
+          filesCubit.editFile(currentFile.id, updatedFile);
+          filesCubit.lastScanFile = updatedFile;
+        } else {
+          // Создаем новый мультистраничный файл
+          final uuid = const Uuid().v4();
+          final formattedDate = DateFormat('ddMMyy').format(DateTime.now());
+          final newFile = ScanFile(
+            id: uuid,
+            name: 'Scan $formattedDate',
+            created: DateTime.now(),
+            size: sizeInMb,
+            pages: [croppedPath],
+          );
+          filesCubit.addFile(newFile);
+          filesCubit.lastScanFile = newFile;
+        }
+      } else {
+        // Одиночный режим – создаем файл с одной страницей
+        final uuid = const Uuid().v4();
+        final formattedDate = DateFormat('ddMMyy').format(DateTime.now());
+        final newFile = ScanFile(
+          id: uuid,
+          name: 'Scan $formattedDate',
+          created: DateTime.now(),
+          size: sizeInMb,
+          pages: [croppedPath],
+        );
+        filesCubit.addFile(newFile);
+
+        // Останавливаем сканер и переходим к экрану редактирования
         scannerKey.currentState?.stopScanner();
-
-        final files =
-            context.read<ScanFilesCubit>().state;
         navigation.navigateTo(
           context,
-          PdfEditScreen(file: files.last),
+          PdfEditScreen(file: newFile),
         );
       }
     }
   }
 
-  /// Метод для выбора файла из памяти
+  /// Обработка выбора файла из галереи
   Future<void> _pickFile(BuildContext context) async {
     final result = await FilePicker.platform.pickFiles(
-      type: FileType.image, // только изображения
-      allowMultiple: false, // один файл
+      type: FileType.image,
+      allowMultiple: false,
     );
 
     if (result != null && result.files.isNotEmpty) {
       final filePath = result.files.single.path;
       if (filePath != null) {
-        // Добавляем файл в cubit
-        context.read<ScanFilesCubit>().addFile(filePath);
-        context.read<FilesCubit>().addFile(filePath);
+        final file = File(filePath);
+        final bytes = file.lengthSync();
+        final sizeInMb = bytes / (1024 * 1024);
+        final filesCubit = context.read<FilesCubit>();
 
-        // Если одиночный режим — сразу уходим на экран сканирования
-        if (!isMultiPhoto) {
-          // Останавливаем работу сканера, чтобы камера не работала в фоне
+        if (isMultiPhoto) {
+          // Если уже есть активный файл для сканирования, обновляем его,
+          // иначе создаём новый файл и назначаем его как текущий
+          if (filesCubit.lastScanFile != null) {
+            final currentFile = filesCubit.lastScanFile!;
+            final updatedFile = currentFile.addPage(filePath, sizeInMb);
+            filesCubit.editFile(currentFile.id, updatedFile);
+            filesCubit.lastScanFile = updatedFile;
+          } else {
+            final uuid = const Uuid().v4();
+            final formattedDate = DateFormat('ddMMyy').format(DateTime.now());
+            final newFile = ScanFile(
+              id: uuid,
+              name: 'Scan $formattedDate',
+              created: DateTime.now(),
+              size: sizeInMb,
+              pages: [filePath],
+            );
+            filesCubit.addFile(newFile);
+            filesCubit.lastScanFile = newFile;
+          }
+        } else {
+          // Одиночный режим – создаём файл и сразу переходим на экран редактирования
+          final uuid = const Uuid().v4();
+          final formattedDate = DateFormat('ddMMyy').format(DateTime.now());
+          final newFile = ScanFile(
+            id: uuid,
+            name: 'Scan $formattedDate',
+            created: DateTime.now(),
+            size: sizeInMb,
+            pages: [filePath],
+          );
+          filesCubit.addFile(newFile);
           scannerKey.currentState?.stopScanner();
-
-          final files = context.read<ScanFilesCubit>().state;
           navigation.navigateTo(
             context,
-            PdfEditScreen(file: files.single),
+            PdfEditScreen(file: newFile),
           );
         }
       }
@@ -131,9 +156,9 @@ class _ScanScreenState extends State<ScanScreen> {
   }
 
   @override
-  void didChangeDependencies() {
-    context.read<ScanFilesCubit>().clearState();
-    super.didChangeDependencies();
+  void dispose() {
+    context.read<FilesCubit>().lastScanFile = null;
+    super.dispose();
   }
 
   @override
@@ -145,7 +170,7 @@ class _ScanScreenState extends State<ScanScreen> {
             child: DocumentScannerWidget(key: scannerKey),
           ),
 
-          // Кнопки управления (внизу)
+          // Нижняя панель с кнопками управления
           Positioned(
             bottom: 0,
             child: Container(
@@ -157,38 +182,42 @@ class _ScanScreenState extends State<ScanScreen> {
               ),
               child: Column(
                 children: [
-                  // Тоггл для переключения режима фото
+                  // Переключатель режима (одиночное / мульти)
                   PhotoToggle(
                     onToggle: (bool isMulti) {
                       isMultiPhoto = isMulti;
                     },
                   ),
-                   SizedBox(height: 10.h),
+                  SizedBox(height: 10.h),
 
-                  // Отображение миниатюры последних файлов и кнопок
-                  BlocBuilder<ScanFilesCubit, List<ScanFile>>(
-                    builder: (BuildContext context, files) {
-                      return Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          // Если есть файлы — показываем последний добавленный
-                          files.isNotEmpty
+                  // Виджет предпросмотра файла: показываем превью последнего изображения и количество файлов
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Если есть файлы – показываем превью последнего добавленного изображения
+                      BlocBuilder<FilesCubit, List<ScanFile>>(
+                        builder: (BuildContext context, files) {
+                          final lastScanFile =
+                              context.read<FilesCubit>().lastScanFile;
+                          return lastScanFile != null &&
+                                  lastScanFile.pages.isNotEmpty
                               ? GestureDetector(
                                   onTap: () {
-                                    // Переходим на экран со всеми файлами
                                     navigation.navigateTo(
                                       context,
-                                      ScanningFilesScreen(),
+                                      ScanningFilesScreen(file: lastScanFile),
                                     );
                                   },
                                   child: Stack(
                                     clipBehavior: Clip.none,
                                     children: [
                                       ClipRRect(
-                                        borderRadius:  BorderRadius.all(
+                                        borderRadius: BorderRadius.all(
                                             Radius.circular(3.r)),
                                         child: Image.file(
-                                          File(files.last.path),
+                                          File(
+                                            lastScanFile.pages.last,
+                                          ),
                                           width: 60.w,
                                           height: 60.w,
                                           fit: BoxFit.cover,
@@ -206,7 +235,8 @@ class _ScanScreenState extends State<ScanScreen> {
                                           ),
                                           child: Center(
                                             child: Text(
-                                              files.length.toString(),
+                                              lastScanFile.pages.length
+                                                  .toString(),
                                               style: AppTextStyle.nunito32
                                                   .copyWith(
                                                 fontSize: 14.sp,
@@ -218,33 +248,33 @@ class _ScanScreenState extends State<ScanScreen> {
                                     ],
                                   ),
                                 )
-                              :  SizedBox(width: 60.w),
+                              : SizedBox(width: 60.w);
+                        },
+                      ),
 
-                          // Кнопка "сделать снимок"
-                          GestureDetector(
-                            onTap: () => _takePhoto(context),
-                            child: Assets.images.shutter.image(
-                              width: 72.w,
-                              height: 72.w,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
+                      // Кнопка "сделать снимок"
+                      GestureDetector(
+                        onTap: () => _takePhoto(context),
+                        child: Assets.images.shutter.image(
+                          width: 72.w,
+                          height: 72.w,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
 
-                          // Кнопка "добавить файл"
-                          CustomCircularButton(
-                            onTap: () => _pickFile(context),
-                            child: AppIcons.addFiles19x22,
-                          ),
-                        ],
-                      );
-                    },
+                      // Кнопка "добавить файл" (из галереи)
+                      CustomCircularButton(
+                        onTap: () => _pickFile(context),
+                        child: AppIcons.addFiles19x22,
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
           ),
 
-          // Кнопка "назад" (вверху слева)
+          // Кнопка "назад" вверху слева
           Positioned(
             top: 75.h,
             left: 16.w,

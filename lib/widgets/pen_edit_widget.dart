@@ -11,7 +11,7 @@ import 'package:owl_tech_pdf_scaner/models/note_data.dart';
 import 'package:owl_tech_pdf_scaner/models/scan_file.dart';
 import 'package:owl_tech_pdf_scaner/widgets/custom_circular_button.dart';
 import 'package:owl_tech_pdf_scaner/widgets/handwriting_painter.dart';
-import 'package:owl_tech_pdf_scaner/widgets/%D1%81ustom_slider.dart';
+import 'package:owl_tech_pdf_scaner/widgets/сustom_slider.dart';
 import 'package:owl_tech_pdf_scaner/widgets/resizable_note.dart';
 
 class PenEditWidget extends StatefulWidget {
@@ -24,6 +24,7 @@ class PenEditWidget extends StatefulWidget {
 }
 
 class PenEditWidgetState extends State<PenEditWidget> {
+  // Режим добавления подписи (ручного ввода)
   bool addPenMode = false;
   Color _textColor = Colors.black;
   double _fontSize = 16.0;
@@ -31,10 +32,24 @@ class PenEditWidgetState extends State<PenEditWidget> {
   final GlobalKey _globalKey = GlobalKey();
   final GlobalKey _drawingKey = GlobalKey();
   LocalKey imageKey = UniqueKey();
+
+  // Списки аннотаций (записей) и текущего рисования для текущей страницы
   final List<NoteData> _notes = [];
   final List<DrawPoint?> _currentDrawing = [];
+
+  // Размеры контейнера, в котором отображается изображение
   double? _displayedWidth;
   double? _displayedHeight;
+
+  // Для многостраничного режима:
+  int _currentPageIndex = 0;
+  late PageController _pageController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: 0);
+  }
 
   void updateImage(LocalKey key) {
     setState(() {
@@ -42,18 +57,11 @@ class PenEditWidgetState extends State<PenEditWidget> {
     });
   }
 
-  @override
-  void initState() {
-    super.initState();
-  }
-
   double getInitialChildSize(BuildContext context, bool addPenMode) {
     final screenHeight = MediaQuery.of(context).size.height;
-    // Если высота экрана больше (например, iPhone 14), используем "больше" значения
     if (screenHeight >= 800) {
       return addPenMode ? 0.85 : 0.6;
     } else {
-      // Для маленьких экранов (например, iPhone 7) немного уменьшаем размеры
       return addPenMode ? 0.95 : 0.55;
     }
   }
@@ -76,340 +84,12 @@ class PenEditWidgetState extends State<PenEditWidget> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
-      backgroundColor: AppColors.background,
-      body: RepaintBoundary(
-        key: _globalKey,
-        child: SizedBox.expand(
-          child: Stack(
-            children: [
-              Align(
-                alignment: Alignment.topCenter,
-                child: Padding(
-                  padding: EdgeInsets.only(top: 24.h),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      // Сохраняем реальные размеры контейнера
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (_displayedWidth != constraints.maxWidth ||
-                            _displayedHeight != constraints.maxHeight) {
-                          setState(() {
-                            _displayedWidth = constraints.maxWidth;
-                            _displayedHeight = constraints.maxHeight;
-                          });
-                        }
-                      });
-                      // Фиксированные размеры для изображения, если они требуются
-                      final double containerWidth = 361.w;
-                      final double containerHeight = 491.h;
-                      return SizedBox(
-                        width: containerWidth,
-                        height: containerHeight,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12.r),
-                          child: Image.file(
-                            File(widget.file.path),
-                            key: imageKey,
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-              ..._notes.map((note) {
-                return ResizableNote(
-                  note: note,
-                  onUpdate: () {
-                    setState(() {});
-                  },
-                );
-              }),
-              DraggableScrollableSheet(
-                initialChildSize: getInitialChildSize(context, addPenMode),
-                minChildSize: getMinChildSize(context, addPenMode),
-                maxChildSize: getMaxChildSize(context, addPenMode),
-                builder: (context, scrollController) {
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.white,
-                      borderRadius:
-                      BorderRadius.vertical(top: Radius.circular(30.r)),
-                    ),
-                    child: ListView(
-                      controller: scrollController,
-                      physics: addPenMode
-                          ? const NeverScrollableScrollPhysics()
-                          : const BouncingScrollPhysics(),
-                      padding: EdgeInsets.all(16.r),
-                      children: [
-                        Center(
-                          child: Container(
-                            width: 110.w,
-                            height: 4.h,
-                            decoration: BoxDecoration(
-                              color: AppColors.black,
-                              borderRadius: BorderRadius.circular(8.r),
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: 8.h),
-                        addPenMode
-                            ? Row(
-                          mainAxisAlignment:
-                          MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Add sign', style: AppTextStyle.exo20),
-                            CustomCircularButton(
-                              withBorder: true,
-                              withShadow: false,
-                              onTap: () {
-                                setState(() {
-                                  if (_currentDrawing.isNotEmpty) {
-                                    _notes.add(
-                                      NoteData(
-                                        points:
-                                        List.from(_currentDrawing),
-                                        offset: Offset(100.w, 100.w),
-                                        color: _textColor,
-                                        strokeWidth: _fontSize,
-                                        size:  Size(150.w, 100.h),
-                                        baseSize:  Size(361.w, 203.h),
-                                      ),
-                                    );
-                                    _currentDrawing.clear();
-                                    isSelectEraser = false;
-                                  }
-                                  addPenMode = false;
-                                });
-                              },
-                              child: AppIcons.selectBlack22x15,
-                            ),
-                          ],
-                        )
-                            : Text('Saved sign', style: AppTextStyle.exo20),
-                        SizedBox(height: 18.h),
-                        addPenMode
-                            ? Container(
-                          key: _drawingKey,
-                          decoration: BoxDecoration(
-                            borderRadius:
-                             BorderRadius.all(Radius.circular(12.r)),
-                            color: AppColors.white,
-                            border: Border.all(
-                              width: 2.w,
-                              color: AppColors.greyIcon,
-                            ),
-                          ),
-                          padding:  EdgeInsets.all(8.w),
-                          width: 361.w,
-                          height: 203.h,
-                          child: GestureDetector(
-                            onPanStart: (details) {
-                              setState(() {
-                                RenderBox box = _drawingKey.currentContext!
-                                    .findRenderObject() as RenderBox;
-                                Offset localPosition = box.globalToLocal(
-                                    details.globalPosition);
-                                _currentDrawing.add(
-                                    DrawPoint(localPosition, isSelectEraser));
-                              });
-                            },
-                            onPanUpdate: (details) {
-                              setState(() {
-                                RenderBox box = _drawingKey.currentContext!
-                                    .findRenderObject() as RenderBox;
-                                Offset localPosition = box.globalToLocal(
-                                    details.globalPosition);
-                                _currentDrawing.add(
-                                    DrawPoint(localPosition, isSelectEraser));
-                              });
-                            },
-                            onPanEnd: (details) {
-                              _currentDrawing.add(null);
-                            },
-                            child: CustomPaint(
-                              painter: HandwritingPainter(
-                                points: _currentDrawing,
-                                color: _textColor,
-                                strokeWidth: _fontSize,
-                                baseSize: Size(361.w, 203.h),
-                              ),
-                              child: Container(),
-                            ),
-                          ),
-                        )
-                            : Wrap(
-                          alignment: WrapAlignment.start,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          spacing: 16.w,
-                          runSpacing: 8.w,
-                          children: [
-                            ..._notes.map((note) {
-                              return Container(
-                                decoration: BoxDecoration(
-                                  borderRadius:  BorderRadius.all(
-                                      Radius.circular(12.r)),
-                                  color: AppColors.white,
-                                  border: Border.all(
-                                    width: 2.w,
-                                    color: AppColors.greyIcon,
-                                  ),
-                                ),
-                                padding:  EdgeInsets.all(8.w),
-                                width: 148.w,
-                                height: 95.h,
-                                child: Stack(
-                                  children: [
-                                    CustomPaint(
-                                      painter: HandwritingPainter(
-                                        points: note.points,
-                                        color: note.color,
-                                        strokeWidth: note.strokeWidth,
-                                        baseSize: note.baseSize,
-                                      ),
-                                      child: Container(),
-                                    ),
-                                    Positioned(
-                                      top: 0,
-                                      right: 0,
-                                      child: GestureDetector(
-                                        onTap: () {
-                                          setState(() {
-                                            _notes.remove(note);
-                                          });
-                                        },
-                                        child: AppIcons.x22x15,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }),
-                            CustomCircularButton(
-                              withBorder: true,
-                              withShadow: false,
-                              onTap: () {
-                                setState(() {
-                                  addPenMode = true;
-                                });
-                              },
-                              child: AppIcons.plusBlack22x22,
-                            ),
-                          ],
-                        ),
-                        if (addPenMode)
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                               SizedBox(height: 24.h),
-                              Text('Font Size', style: AppTextStyle.exo20),
-                               SizedBox(height: 16.h),
-                              Row(
-                                children: [
-                                  Text('Small', style: AppTextStyle.exo16),
-                                  Expanded(
-                                    child: GradientSlider(
-                                      isActive: addPenMode,
-                                      onChanged: (val) {
-                                        setState(() {
-                                          _fontSize = val;
-                                        });
-                                      },
-                                      value: _fontSize,
-                                    ),
-                                  ),
-                                  Text('Large', style: AppTextStyle.exo16),
-                                ],
-                              ),
-                               SizedBox(height: 24.h),
-                              Text('Color', style: AppTextStyle.exo20),
-                               SizedBox(height: 16.h),
-                              SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: Row(
-                                  children: [
-                                    _eraserDot(),
-                                     SizedBox(width: 8.w),
-                                    _colorDot(Colors.black),
-                                    _colorDot(Colors.white),
-                                    _colorDot(Colors.grey),
-                                    _colorDot(Colors.yellow),
-                                    _colorDot(Colors.orange),
-                                    _colorDot(Colors.red),
-                                    _colorDot(Colors.green),
-                                    _colorDot(Colors.greenAccent),
-                                    _colorDot(Colors.blue),
-                                    _colorDot(Colors.indigoAccent),
-                                    _colorDot(Colors.purple),
-                                  ],
-                                ),
-                              ),
-                               SizedBox(height: 16.h),
-                            ],
-                          ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _colorDot(Color color, {bool showBorder = true}) {
-    final bool isSelected = (_textColor == color);
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _textColor = color;
-          isSelectEraser = false;
-        });
-      },
-      child: Container(
-        margin:  EdgeInsets.only(right: 8.w),
-        width: 30.w,
-        height: 30.w,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          border: isSelected
-              ? Border.all(color: AppColors.black, width: 3.w)
-              : (showBorder
-              ? Border.all(color: AppColors.greyIcon, width: 2.w)
-              : null),
-        ),
-      ),
-    );
-  }
-
-  Widget _eraserDot() {
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          isSelectEraser = !isSelectEraser;
-        });
-      },
-      child: Container(
-        width: 30.w,
-        height: 30.w,
-        color: Colors.transparent,
-        child: Center(child: FittedBox(child: AppIcons.eraser28x26,),),
-      ),
-    );
-  }
-
+  /// Метод сохранения аннотированного изображения для текущей страницы.
+  /// Обратите внимание: вместо widget.file.path теперь используется путь из widget.file.pages[_currentPageIndex].
   Future<void> saveAnnotatedImage() async {
-    final path = widget.file.path;
-    if (path.isEmpty) return;
-    final file = File(path);
+    final pagePath = widget.file.pages[_currentPageIndex];
+    if (pagePath.isEmpty) return;
+    final file = File(pagePath);
     if (!await file.exists()) return;
     try {
       final fileBytes = await file.readAsBytes();
@@ -418,7 +98,6 @@ class PenEditWidgetState extends State<PenEditWidget> {
       final ui.Image originalImage = frameInfo.image;
       final int originalWidth = originalImage.width;
       final int originalHeight = originalImage.height;
-      // Если размеры контейнера не сохранены, используем дефолтные значения.
       final double displayedWidth = _displayedWidth ?? 361.w;
       final double displayedHeight = _displayedHeight ?? 491.h;
       final double scaleX = originalWidth / displayedWidth;
@@ -426,6 +105,7 @@ class PenEditWidgetState extends State<PenEditWidget> {
       final ui.PictureRecorder recorder = ui.PictureRecorder();
       final Canvas canvas = Canvas(recorder);
       canvas.drawImage(originalImage, Offset.zero, Paint());
+      // Отрисовка каждой заметки (аннотации) для текущей страницы
       for (var note in _notes) {
         final Offset notePos = Offset(note.offset.dx * scaleX, note.offset.dy * scaleY);
         final double noteScaleX = (note.size.width / note.baseSize.width) * scaleX;
@@ -466,5 +146,609 @@ class PenEditWidgetState extends State<PenEditWidget> {
     } catch (e) {
       debugPrint('Ошибка при сохранении аннотированного изображения: $e');
     }
+  }
+
+  /// Метод для построения UI области редактирования (аннотации) для конкретной страницы.
+  /// Вместо использования widget.file.path используется переданный путь.
+  Widget _buildAnnotationUI(String pagePath) {
+    return Align(
+      alignment: Alignment.topCenter,
+      child: Padding(
+        padding: EdgeInsets.only(top: 24.h),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // Сохраняем реальные размеры контейнера (для масштабирования аннотаций)
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (_displayedWidth != constraints.maxWidth ||
+                  _displayedHeight != constraints.maxHeight) {
+                setState(() {
+                  _displayedWidth = constraints.maxWidth;
+                  _displayedHeight = constraints.maxHeight;
+                });
+              }
+            });
+            // Фиксированные размеры для изображения
+            final double containerWidth = 361.w;
+            final double containerHeight = 491.h;
+            return SizedBox(
+              width: containerWidth,
+              height: containerHeight,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12.r),
+                child: Image.file(
+                  File(pagePath),
+                  key: imageKey,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  /// При смене страницы в многостраничном режиме сохраняем текущие изменения,
+  /// затем сбрасываем списки аннотаций и обновляем индекс.
+  Future<void> _onPageChanged(int newPage) async {
+    await saveAnnotatedImage();
+    setState(() {
+      _currentPageIndex = newPage;
+      _notes.clear();
+      _currentDrawing.clear();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      resizeToAvoidBottomInset: false,
+      backgroundColor: AppColors.background,
+      body: RepaintBoundary(
+        key: _globalKey,
+        child: widget.file.pages.length > 1
+        // Многостраничный режим: PageView с вертикальной прокруткой
+            ? PageView.builder(
+          controller: _pageController,
+          scrollDirection: Axis.vertical,
+          itemCount: widget.file.pages.length,
+          onPageChanged: _onPageChanged,
+          itemBuilder: (context, index) {
+            return Stack(
+              children: [
+                // Отображаем изображение для страницы с аннотациями
+                _buildAnnotationUI(widget.file.pages[index]),
+                // Отрисовка заметок (аннотаций)
+                ..._notes.map((note) {
+                  return ResizableNote(
+                    note: note,
+                    onUpdate: () {
+                      setState(() {});
+                    },
+                  );
+                }),
+                // Панель редактирования (DraggableScrollableSheet) остаётся общей для всех страниц
+                DraggableScrollableSheet(
+                  initialChildSize: getInitialChildSize(context, addPenMode),
+                  minChildSize: getMinChildSize(context, addPenMode),
+                  maxChildSize: getMaxChildSize(context, addPenMode),
+                  builder: (context, scrollController) {
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.white,
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(30.r)),
+                      ),
+                      child: ListView(
+                        controller: scrollController,
+                        physics: addPenMode
+                            ? const NeverScrollableScrollPhysics()
+                            : const BouncingScrollPhysics(),
+                        padding: EdgeInsets.all(16.r),
+                        children: [
+                          Center(
+                            child: Container(
+                              width: 110.w,
+                              height: 4.h,
+                              decoration: BoxDecoration(
+                                color: AppColors.black,
+                                borderRadius: BorderRadius.circular(8.r),
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: 8.h),
+                          addPenMode
+                              ? Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Add sign', style: AppTextStyle.exo20),
+                              CustomCircularButton(
+                                withBorder: true,
+                                withShadow: false,
+                                onTap: () {
+                                  setState(() {
+                                    if (_currentDrawing.isNotEmpty) {
+                                      _notes.add(
+                                        NoteData(
+                                          points: List.from(_currentDrawing),
+                                          offset: Offset(100.w, 100.w),
+                                          color: _textColor,
+                                          strokeWidth: _fontSize,
+                                          size: Size(150.w, 100.h),
+                                          baseSize: Size(361.w, 203.h),
+                                        ),
+                                      );
+                                      _currentDrawing.clear();
+                                      isSelectEraser = false;
+                                    }
+                                    addPenMode = false;
+                                  });
+                                },
+                                child: AppIcons.selectBlack22x15,
+                              ),
+                            ],
+                          )
+                              : Text('Saved sign', style: AppTextStyle.exo20),
+                          SizedBox(height: 18.h),
+                          addPenMode
+                              ? Container(
+                            key: _drawingKey,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.all(Radius.circular(12.r)),
+                              color: AppColors.white,
+                              border: Border.all(width: 2.w, color: AppColors.greyIcon),
+                            ),
+                            padding: EdgeInsets.all(8.w),
+                            width: 361.w,
+                            height: 203.h,
+                            child: GestureDetector(
+                              onPanStart: (details) {
+                                setState(() {
+                                  RenderBox box = _drawingKey.currentContext!
+                                      .findRenderObject() as RenderBox;
+                                  Offset localPosition = box.globalToLocal(details.globalPosition);
+                                  _currentDrawing.add(DrawPoint(localPosition, isSelectEraser));
+                                });
+                              },
+                              onPanUpdate: (details) {
+                                setState(() {
+                                  RenderBox box = _drawingKey.currentContext!
+                                      .findRenderObject() as RenderBox;
+                                  Offset localPosition = box.globalToLocal(details.globalPosition);
+                                  _currentDrawing.add(DrawPoint(localPosition, isSelectEraser));
+                                });
+                              },
+                              onPanEnd: (details) {
+                                _currentDrawing.add(null);
+                              },
+                              child: CustomPaint(
+                                painter: HandwritingPainter(
+                                  points: _currentDrawing,
+                                  color: _textColor,
+                                  strokeWidth: _fontSize,
+                                  baseSize: Size(361.w, 203.h),
+                                ),
+                                child: Container(),
+                              ),
+                            ),
+                          )
+                              : Wrap(
+                            alignment: WrapAlignment.start,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 16.w,
+                            runSpacing: 8.w,
+                            children: [
+                              ..._notes.map((note) {
+                                return Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.all(Radius.circular(12.r)),
+                                    color: AppColors.white,
+                                    border: Border.all(width: 2.w, color: AppColors.greyIcon),
+                                  ),
+                                  padding: EdgeInsets.all(8.w),
+                                  width: 148.w,
+                                  height: 95.h,
+                                  child: Stack(
+                                    children: [
+                                      CustomPaint(
+                                        painter: HandwritingPainter(
+                                          points: note.points,
+                                          color: note.color,
+                                          strokeWidth: note.strokeWidth,
+                                          baseSize: note.baseSize,
+                                        ),
+                                        child: Container(),
+                                      ),
+                                      Positioned(
+                                        top: 0,
+                                        right: 0,
+                                        child: GestureDetector(
+                                          onTap: () {
+                                            setState(() {
+                                              _notes.remove(note);
+                                            });
+                                          },
+                                          child: AppIcons.x22x15,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }),
+                              CustomCircularButton(
+                                withBorder: true,
+                                withShadow: false,
+                                onTap: () {
+                                  setState(() {
+                                    addPenMode = true;
+                                  });
+                                },
+                                child: AppIcons.plusBlack22x22,
+                              ),
+                            ],
+                          ),
+                          if (addPenMode)
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                SizedBox(height: 24.h),
+                                Text('Font Size', style: AppTextStyle.exo20),
+                                SizedBox(height: 16.h),
+                                Row(
+                                  children: [
+                                    Text('Small', style: AppTextStyle.exo16),
+                                    Expanded(
+                                      child: GradientSlider(
+                                        isActive: addPenMode,
+                                        onChanged: (val) {
+                                          setState(() {
+                                            _fontSize = val;
+                                          });
+                                        },
+                                        value: _fontSize,
+                                      ),
+                                    ),
+                                    Text('Large', style: AppTextStyle.exo16),
+                                  ],
+                                ),
+                                SizedBox(height: 24.h),
+                                Text('Color', style: AppTextStyle.exo20),
+                                SizedBox(height: 16.h),
+                                SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: Row(
+                                    children: [
+                                      _eraserDot(),
+                                      SizedBox(width: 8.w),
+                                      _colorDot(Colors.black),
+                                      _colorDot(Colors.white),
+                                      _colorDot(Colors.grey),
+                                      _colorDot(Colors.yellow),
+                                      _colorDot(Colors.orange),
+                                      _colorDot(Colors.red),
+                                      _colorDot(Colors.green),
+                                      _colorDot(Colors.greenAccent),
+                                      _colorDot(Colors.blue),
+                                      _colorDot(Colors.indigoAccent),
+                                      _colorDot(Colors.purple),
+                                    ],
+                                  ),
+                                ),
+                                SizedBox(height: 16.h),
+                              ],
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            );
+          },
+        )
+        // Если файл одностраничный – оставляем существующую реализацию
+            : Stack(
+          children: [
+            Align(
+              alignment: Alignment.topCenter,
+              child: Padding(
+                padding: EdgeInsets.only(top: 24.h),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (_displayedWidth != constraints.maxWidth ||
+                          _displayedHeight != constraints.maxHeight) {
+                        setState(() {
+                          _displayedWidth = constraints.maxWidth;
+                          _displayedHeight = constraints.maxHeight;
+                        });
+                      }
+                    });
+                    final double containerWidth = 361.w;
+                    final double containerHeight = 491.h;
+                    return SizedBox(
+                      width: containerWidth,
+                      height: containerHeight,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12.r),
+                        child: Image.file(
+                          File(widget.file.pages.first),
+                          key: imageKey,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            ..._notes.map((note) {
+              return ResizableNote(
+                note: note,
+                onUpdate: () {
+                  setState(() {});
+                },
+              );
+            }),
+            DraggableScrollableSheet(
+              initialChildSize: getInitialChildSize(context, addPenMode),
+              minChildSize: getMinChildSize(context, addPenMode),
+              maxChildSize: getMaxChildSize(context, addPenMode),
+              builder: (context, scrollController) {
+                return Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(30.r)),
+                  ),
+                  child: ListView(
+                    controller: scrollController,
+                    physics: addPenMode
+                        ? const NeverScrollableScrollPhysics()
+                        : const BouncingScrollPhysics(),
+                    padding: EdgeInsets.all(16.r),
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 110.w,
+                          height: 4.h,
+                          decoration: BoxDecoration(
+                            color: AppColors.black,
+                            borderRadius: BorderRadius.circular(8.r),
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 8.h),
+                      addPenMode
+                          ? Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Add sign', style: AppTextStyle.exo20),
+                          CustomCircularButton(
+                            withBorder: true,
+                            withShadow: false,
+                            onTap: () {
+                              setState(() {
+                                if (_currentDrawing.isNotEmpty) {
+                                  _notes.add(
+                                    NoteData(
+                                      points: List.from(_currentDrawing),
+                                      offset: Offset(100.w, 100.w),
+                                      color: _textColor,
+                                      strokeWidth: _fontSize,
+                                      size: Size(150.w, 100.h),
+                                      baseSize: Size(361.w, 203.h),
+                                    ),
+                                  );
+                                  _currentDrawing.clear();
+                                  isSelectEraser = false;
+                                }
+                                addPenMode = false;
+                              });
+                            },
+                            child: AppIcons.selectBlack22x15,
+                          ),
+                        ],
+                      )
+                          : Text('Saved sign', style: AppTextStyle.exo20),
+                      SizedBox(height: 18.h),
+                      addPenMode
+                          ? Container(
+                        key: _drawingKey,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.all(Radius.circular(12.r)),
+                          color: AppColors.white,
+                          border: Border.all(width: 2.w, color: AppColors.greyIcon),
+                        ),
+                        padding: EdgeInsets.all(8.w),
+                        width: 361.w,
+                        height: 203.h,
+                        child: GestureDetector(
+                          onPanStart: (details) {
+                            setState(() {
+                              RenderBox box = _drawingKey.currentContext!
+                                  .findRenderObject() as RenderBox;
+                              Offset localPosition = box.globalToLocal(details.globalPosition);
+                              _currentDrawing.add(DrawPoint(localPosition, isSelectEraser));
+                            });
+                          },
+                          onPanUpdate: (details) {
+                            setState(() {
+                              RenderBox box = _drawingKey.currentContext!
+                                  .findRenderObject() as RenderBox;
+                              Offset localPosition = box.globalToLocal(details.globalPosition);
+                              _currentDrawing.add(DrawPoint(localPosition, isSelectEraser));
+                            });
+                          },
+                          onPanEnd: (details) {
+                            _currentDrawing.add(null);
+                          },
+                          child: CustomPaint(
+                            painter: HandwritingPainter(
+                              points: _currentDrawing,
+                              color: _textColor,
+                              strokeWidth: _fontSize,
+                              baseSize: Size(361.w, 203.h),
+                            ),
+                            child: Container(),
+                          ),
+                        ),
+                      )
+                          : Wrap(
+                        alignment: WrapAlignment.start,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 16.w,
+                        runSpacing: 8.w,
+                        children: [
+                          ..._notes.map((note) {
+                            return Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.all(Radius.circular(12.r)),
+                                color: AppColors.white,
+                                border: Border.all(width: 2.w, color: AppColors.greyIcon),
+                              ),
+                              padding: EdgeInsets.all(8.w),
+                              width: 148.w,
+                              height: 95.h,
+                              child: Stack(
+                                children: [
+                                  CustomPaint(
+                                    painter: HandwritingPainter(
+                                      points: note.points,
+                                      color: note.color,
+                                      strokeWidth: note.strokeWidth,
+                                      baseSize: note.baseSize,
+                                    ),
+                                    child: Container(),
+                                  ),
+                                  Positioned(
+                                    top: 0,
+                                    right: 0,
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        setState(() {
+                                          _notes.remove(note);
+                                        });
+                                      },
+                                      child: AppIcons.x22x15,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
+                          CustomCircularButton(
+                            withBorder: true,
+                            withShadow: false,
+                            onTap: () {
+                              setState(() {
+                                addPenMode = true;
+                              });
+                            },
+                            child: AppIcons.plusBlack22x22,
+                          ),
+                        ],
+                      ),
+                      if (addPenMode)
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(height: 24.h),
+                            Text('Font Size', style: AppTextStyle.exo20),
+                            SizedBox(height: 16.h),
+                            Row(
+                              children: [
+                                Text('Small', style: AppTextStyle.exo16),
+                                Expanded(
+                                  child: GradientSlider(
+                                    isActive: addPenMode,
+                                    onChanged: (val) {
+                                      setState(() {
+                                        _fontSize = val;
+                                      });
+                                    },
+                                    value: _fontSize,
+                                  ),
+                                ),
+                                Text('Large', style: AppTextStyle.exo16),
+                              ],
+                            ),
+                            SizedBox(height: 24.h),
+                            Text('Color', style: AppTextStyle.exo20),
+                            SizedBox(height: 16.h),
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  _eraserDot(),
+                                  SizedBox(width: 8.w),
+                                  _colorDot(Colors.black),
+                                  _colorDot(Colors.white),
+                                  _colorDot(Colors.grey),
+                                  _colorDot(Colors.yellow),
+                                  _colorDot(Colors.orange),
+                                  _colorDot(Colors.red),
+                                  _colorDot(Colors.green),
+                                  _colorDot(Colors.greenAccent),
+                                  _colorDot(Colors.blue),
+                                  _colorDot(Colors.indigoAccent),
+                                  _colorDot(Colors.purple),
+                                ],
+                              ),
+                            ),
+                            SizedBox(height: 16.h),
+                          ],
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _colorDot(Color color, {bool showBorder = true}) {
+    final bool isSelected = (_textColor == color);
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _textColor = color;
+          isSelectEraser = false;
+        });
+      },
+      child: Container(
+        margin: EdgeInsets.only(right: 8.w),
+        width: 30.w,
+        height: 30.w,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: isSelected
+              ? Border.all(color: AppColors.black, width: 3.w)
+              : (showBorder ? Border.all(color: AppColors.greyIcon, width: 2.w) : null),
+        ),
+      ),
+    );
+  }
+
+  Widget _eraserDot() {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          isSelectEraser = !isSelectEraser;
+        });
+      },
+      child: Container(
+        width: 30.w,
+        height: 30.w,
+        color: Colors.transparent,
+        child: Center(
+          child: FittedBox(
+            child: AppIcons.eraser28x26,
+          ),
+        ),
+      ),
+    );
   }
 }

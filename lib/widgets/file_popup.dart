@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:owl_tech_pdf_scaner/app/app_icons.dart';
-import 'package:owl_tech_pdf_scaner/blocs/scan_files_cubit.dart';
 import 'package:owl_tech_pdf_scaner/models/scan_file.dart';
 
 import '../app/app_shadows.dart';
 import '../app/app_text_style.dart';
-import '../blocs/files_cubit/files_cubit.dart';
+import '../blocs/files_cubit.dart';
 import '../services/file_share_service.dart';
 
 class FilePopup extends StatelessWidget {
@@ -18,7 +17,7 @@ class FilePopup extends StatelessWidget {
   /// Функция для создания PDF-файла из аннотированного изображения и его шаринга
   Future<void> _sharePdfFile() async {
     try {
-      await FileShareService.shareImageAsPdf(file.path, text: 'Ваш PDF файл');
+      await FileShareService.shareFileAsPdf(file, text: 'Ваш PDF файл');
 
     } catch (e) {
       debugPrint("Ошибка при создании или шаринге PDF: $e");
@@ -46,7 +45,6 @@ class FilePopup extends StatelessWidget {
               _buildMenuItem(
                 onTap: () {
                   Navigator.pop(context);
-                  context.read<ScanFilesCubit>().removeFile(file.id);
                   context.read<FilesCubit>().removeFile(file.id);
                 },
                 title: 'Delete',

@@ -5,8 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
-import 'package:owl_tech_pdf_scaner/blocs/files_cubit/files_cubit.dart';
-import 'package:owl_tech_pdf_scaner/blocs/scan_files_cubit.dart';
+import 'package:owl_tech_pdf_scaner/blocs/files_cubit.dart';
 import 'package:owl_tech_pdf_scaner/blocs/text_edit_cubit.dart';
 import 'package:owl_tech_pdf_scaner/screens/files_page.dart';
 import 'package:owl_tech_pdf_scaner/screens/loading_screen.dart';
@@ -50,9 +49,6 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        BlocProvider(
-          create: (context) => ScanFilesCubit(),
-        ),
         BlocProvider(
           create: (context) => FilesCubit(),
         ),

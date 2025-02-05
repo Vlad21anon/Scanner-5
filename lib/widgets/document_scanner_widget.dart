@@ -5,13 +5,13 @@ import 'dart:math' as math;
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart'; // для compute
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:opencv_dart/opencv_dart.dart' as cv;
 import 'package:image/image.dart' as img;
 import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
 import 'package:owl_tech_pdf_scaner/widgets/paper_border_painter.dart';
 import 'package:path_provider/path_provider.dart'; // для временной папки
 import 'package:path/path.dart' as path;
+import 'package:visibility_detector/visibility_detector.dart';
 
 import '../screens/loading_screen.dart';
 
@@ -40,18 +40,33 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
 
   int _frameCounter = 0; // Счётчик кадров для обработки каждого N-ого кадра
   final int _processEveryNthFrame = 2; // например, обрабатывать каждый второй кадр
+  bool _isVisible = true; // Флаг, отражающий, отображается ли виджет на экране
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
     _initCamera();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    offsetAdjustmentY = getOffsetAdjustmentY(context);
+  }
+
+  double getOffsetAdjustmentY(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    if (screenHeight >= 800) {
+      return -85;
+    } else {
+      return -55;
+    }
   }
 
   Future<void> _initCamera() async {
     final cameras = await availableCameras();
-
-    // Используем разрешение low для снижения нагрузки
     _controller = CameraController(
       cameras[0],
       ResolutionPreset.medium,
@@ -63,8 +78,10 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
       _isCameraInitialized = true;
     });
     _controller.startImageStream((CameraImage image) {
+      // Если виджет не виден – прекращаем обработку кадра
+      if (!_isVisible) return;
+
       _frameCounter++;
-      // Обработка только каждого _processEveryNthFrame кадра
       if (_frameCounter % _processEveryNthFrame != 0) return;
 
       if (!_isProcessing) {
@@ -85,8 +102,6 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    // Останавливаем поток изображений и освобождаем контроллер
-    // Останавливаем поток изображений и освобождаем контроллер
     if (_controller.value.isStreamingImages) {
       _controller.stopImageStream();
     }
@@ -101,12 +116,14 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
 
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused) {
-      // Останавливаем поток, если приложение не активно
+      _isVisible = false; // Флаг скрытости
       _controller.stopImageStream();
+      debugPrint("Приложение не активно, сканер остановлен");
     } else if (state == AppLifecycleState.resumed) {
-      // При возобновлении, если контроллер не работает, запускаем его
+      _isVisible = true;
       if (!_controller.value.isStreamingImages) {
         _controller.startImageStream((CameraImage image) {
+          if (!_isVisible) return;
           _frameCounter++;
           if (_frameCounter % _processEveryNthFrame != 0) return;
           if (!_isProcessing) {
@@ -199,13 +216,15 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
 
   Future<void> _processCameraImage(CameraImage image) async {
     try {
-      _cameraImageSize =
-          Size(image.width.toDouble(), image.height.toDouble());
+      _cameraImageSize = Size(image.width.toDouble(), image.height.toDouble());
       Uint8List pngBytes = convertYUV420ToPNG(image);
       _lastPngBytes = pngBytes;
 
       debugPrint(
           "Начинаем обработку кадра. Размер изображения: ${image.width}x${image.height}");
+
+      // Если виджет не виден, нет смысла выполнять дальнейшую обработку
+      if (!_isVisible) return;
 
       final result = await compute(processFrameInIsolate, {
         'pngBytes': pngBytes,
@@ -220,7 +239,6 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
 
       List<List<double>> cornersList =
       result['corners'] as List<List<double>>;
-      // Здесь можно также обновлять preview, если нужно
 
       debugPrint("Получено ${cornersList.length} углов из изолята");
 
@@ -286,34 +304,66 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.black,
-      body: _isCameraInitialized
-          ? LayoutBuilder(
-        builder: (context, constraints) {
-          return Padding(
-            padding:  EdgeInsets.only(top: 60.h),
-            child: Stack(
-              alignment: Alignment.topCenter,
-              children: [
-                CameraPreview(_controller),
-                if (_paperCorners != null && _cameraImageSize != null)
-                  CustomPaint(
-                    size: Size(constraints.maxWidth, constraints.maxHeight),
-                    painter: PaperBorderPainter(
-                      corners: _paperCorners!,
-                      cameraImageSize: _cameraImageSize!,
-                      rotateClockwise: true,
-                      offsetAdjustmentX: offsetAdjustmentX,
-                      offsetAdjustmentY: offsetAdjustmentY,
+    return VisibilityDetector(
+      key: const Key("document-scanner-widget"),
+      onVisibilityChanged: (VisibilityInfo info) {
+        // Обновляем флаг видимости в зависимости от процента отображения
+        bool isNowVisible = info.visibleFraction > 0;
+        if (_isVisible != isNowVisible) {
+          if (mounted) {
+            setState(() {
+              _isVisible = isNowVisible;
+            });
+          }
+
+          if (!isNowVisible) {
+            stopScanner();
+          } else {
+            // При возвращении на экран можно заново запустить imageStream,
+            // если контроллер инициализирован и не работает
+            if (_isCameraInitialized && !_controller.value.isStreamingImages) {
+              _controller.startImageStream((CameraImage image) {
+                if (!_isVisible) return;
+                _frameCounter++;
+                if (_frameCounter % _processEveryNthFrame != 0) return;
+                if (!_isProcessing) {
+                  _isProcessing = true;
+                  _processCameraImage(image);
+                }
+              });
+            }
+          }
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.black,
+        body: _isCameraInitialized
+            ? LayoutBuilder(
+          builder: (context, constraints) {
+            return Padding(
+              padding: const EdgeInsets.only(top: 60),
+              child: Stack(
+                alignment: Alignment.topCenter,
+                children: [
+                  CameraPreview(_controller),
+                  if (_paperCorners != null && _cameraImageSize != null)
+                    CustomPaint(
+                      size: Size(constraints.maxWidth, constraints.maxHeight),
+                      painter: PaperBorderPainter(
+                        corners: _paperCorners!,
+                        cameraImageSize: _cameraImageSize!,
+                        rotateClockwise: true,
+                        offsetAdjustmentX: offsetAdjustmentX,
+                        offsetAdjustmentY: offsetAdjustmentY,
+                      ),
                     ),
-                  ),
-              ],
-            ),
-          );
-        },
-      )
-          : LoadingScreen(),
+                ],
+              ),
+            );
+          },
+        )
+            : LoadingScreen(),
+      ),
     );
   }
 }

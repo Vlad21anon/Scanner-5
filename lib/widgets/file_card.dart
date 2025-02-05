@@ -12,6 +12,8 @@ import 'file_popup.dart';
 
 class FileCard extends StatelessWidget {
   final ScanFile file;
+  /// Новый параметр для передачи конкретного пути к изображению (например, для мультистраничного файла)
+  final String? imagePath;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
   final bool isSelectedMode;
@@ -22,10 +24,15 @@ class FileCard extends StatelessWidget {
     required this.onTap,
     required this.onLongPress,
     required this.isSelectedMode,
+    this.imagePath,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Если imagePath передан и не пустой, используем его, иначе берем file.path
+    final displayImagePath =
+    (imagePath != null && imagePath!.isNotEmpty) ? imagePath! : file.pages.first;
+
     return GestureDetector(
       onTap: onTap,
       onLongPress: onLongPress,
@@ -51,7 +58,7 @@ class FileCard extends StatelessWidget {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8.r),
                       child: Image.file(
-                        File(file.path),
+                        File(displayImagePath),
                         fit: BoxFit.fill,
                         width: 64.w,
                         height: 87.h,
@@ -68,31 +75,32 @@ class FileCard extends StatelessWidget {
             ),
             SizedBox(width: 26.w),
             Expanded(
-                child: Container(
-              color: Colors.transparent,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    file.name,
-                    style: AppTextStyle.exo20,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  SizedBox(height: 12.h),
-                  Text(
-                    '${DateFormat('dd MMM yyyy').format(file.created)} ${file.size.toStringAsFixed(1)}MB',
-                    style: AppTextStyle.exo16,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+              child: Container(
+                color: Colors.transparent,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      file.name,
+                      style: AppTextStyle.exo20,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    SizedBox(height: 12.h),
+                    Text(
+                      '${DateFormat('dd MMM yyyy').format(file.created)} ${file.size.toStringAsFixed(1)}MB',
+                      style: AppTextStyle.exo16,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
-            )),
+            ),
             SizedBox(width: 26.w),
             GestureDetector(
               onTap: () {
                 final RenderBox button =
-                    context.findRenderObject() as RenderBox;
+                context.findRenderObject() as RenderBox;
                 final Offset position = button.localToGlobal(Offset.zero);
 
                 showDialog(
@@ -127,25 +135,25 @@ class FileCard extends StatelessWidget {
             if (isSelectedMode)
               file.isSelected
                   ? Container(
-                      height: 40.h,
-                      width: 40.w,
-                      color: Colors.transparent,
-                      child: Center(
-                        child: FittedBox(
-                          child: AppIcons.circleBlue24x24,
-                        ),
-                      ),
-                    )
+                height: 40.h,
+                width: 40.w,
+                color: Colors.transparent,
+                child: Center(
+                  child: FittedBox(
+                    child: AppIcons.circleBlue24x24,
+                  ),
+                ),
+              )
                   : Container(
-                      width: 40.w,
-                      height: 40.h,
-                      color: Colors.transparent,
-                      child: Center(
-                        child: FittedBox(
-                          child: AppIcons.circleBorderlessGreyIcon24x24,
-                        ),
-                      ),
-                    ),
+                width: 40.w,
+                height: 40.h,
+                color: Colors.transparent,
+                child: Center(
+                  child: FittedBox(
+                    child: AppIcons.circleBorderlessGreyIcon24x24,
+                  ),
+                ),
+              ),
           ],
         ),
       ),

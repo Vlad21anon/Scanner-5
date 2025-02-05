@@ -3,7 +3,9 @@ class ScanFile {
   final String name;
   final DateTime created;
   final double size;
-  final String path;
+  /// Если файл одностраничный, то используется поле path.
+  /// Если мультистраничный, то здесь хранятся пути ко всем страницам.
+  final List<String> pages;
   final bool isSelected;
 
   ScanFile({
@@ -11,16 +13,29 @@ class ScanFile {
     required this.name,
     required this.created,
     required this.size,
-    required this.path,
+    required this.pages,
     this.isSelected = false,
   });
 
+  // Метод для добавления новой страницы в мультистраничный файл
+  ScanFile addPage(String pagePath, double additionalSize) {
+    return ScanFile(
+      id: id,
+      name: name,
+      created: created,
+      size: size + additionalSize,
+      pages: List<String>.from(pages)..add(pagePath),
+      isSelected: isSelected,
+    );
+  }
+
+  // Остальные методы (copyWith, toJson, fromJson) нужно обновить, чтобы учитывать pages.
   ScanFile copyWith({
     String? id,
     String? name,
     DateTime? created,
     double? size,
-    String? path,
+    List<String>? pages,
     bool? isSelected,
   }) {
     return ScanFile(
@@ -28,7 +43,7 @@ class ScanFile {
       name: name ?? this.name,
       created: created ?? this.created,
       size: size ?? this.size,
-      path: path ?? this.path,
+      pages: pages ?? this.pages,
       isSelected: isSelected ?? this.isSelected,
     );
   }
@@ -39,7 +54,7 @@ class ScanFile {
       'name': name,
       'created': created.toIso8601String(),
       'size': size,
-      'path': path,
+      'pages': pages,
       'isSelected': isSelected,
     };
   }
@@ -50,7 +65,7 @@ class ScanFile {
       name: json['name'],
       created: DateTime.parse(json['created']),
       size: (json['size'] as num).toDouble(),
-      path: json['path'],
+      pages: List<String>.from(json['pages'] as List),
       isSelected: json['isSelected'] ?? false,
     );
   }

@@ -53,6 +53,8 @@ dependencies:
   purchases_flutter: ^8.4.4
   shared_preferences: ^2.0.15
   flutter_svg: ^2.0.17
+  visibility_detector: ^0.2.2
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:owl_tech_pdf_scaner/app/app_icons.dart';
 import 'package:owl_tech_pdf_scaner/models/scan_file.dart';
 import '../app/app_colors.dart';
 import '../app/app_text_style.dart';
-import '../gen/assets.gen.dart';
+import '../blocs/files_cubit.dart';
 import '../services/file_share_service.dart';
 import '../services/navigation_service.dart';
 import '../widgets/crop_widget.dart';
@@ -30,7 +31,7 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
   late int _penModeCount; // Счётчик использования режима Pen
 
   // Глобальные ключи для вызова функций сохранения в каждом режиме
-  final GlobalKey<CropWidgetState> _cropKey = GlobalKey<CropWidgetState>();
+  final GlobalKey<MultiPageCropWidgetState> _cropKey = GlobalKey<MultiPageCropWidgetState>();
   final GlobalKey<TextEditWidgetState> _textKey = GlobalKey<TextEditWidgetState>();
   final GlobalKey<PenEditWidgetState> _penKey = GlobalKey<PenEditWidgetState>();
 
@@ -41,7 +42,7 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
     _penModeCount = 0;
     _pages = [
       // 0. Режим обрезки
-      CropWidget(
+      MultiPageCropWidget(
         key: _cropKey,
         file: widget.file,
       ),
@@ -106,7 +107,7 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
   /// Функция для создания PDF-файла из аннотированного изображения и его шаринга
   Future<void> _sharePdfFile() async {
     try {
-      await FileShareService.shareImageAsPdf(widget.file.path, text: 'Ваш PDF файл');
+      //await FileShareService.shareImageAsPdf(widget.file.path, text: 'Ваш PDF файл');
 
     } catch (e) {
       debugPrint("Ошибка при создании или шаринге PDF: $e");
@@ -157,6 +158,12 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
       _selectedIndex = newIndex;
       _oldIndex = newIndex;
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    context.read<FilesCubit>().lastScanFile = null;
+    super.didChangeDependencies();
   }
 
   @override

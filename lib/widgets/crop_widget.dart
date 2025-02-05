@@ -1,79 +1,80 @@
-import 'dart:io'; // Для File
-import 'dart:math' as math; // Для min/max
+import 'dart:io';
+import 'dart:math' as math;
 import 'package:defer_pointer/defer_pointer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:image/image.dart' as img; // Для обрезки и кодирования
+import 'package:image/image.dart' as img;
 import 'package:owl_tech_pdf_scaner/models/scan_file.dart';
-import 'package:owl_tech_pdf_scaner/widgets/resizable_note.dart';
-
+import 'package:owl_tech_pdf_scaner/widgets/resizable_note.dart'; // если используется
 import '../app/app_colors.dart';
 
 ///
-/// Виджет обрезки фото: пользователь двигает «углы»,
-/// а метод [saveCrop] обрезает и пересохраняет файл.
+/// Виджет для обрезки изображения (поддержка многостраничного режима).
 ///
-class CropWidget extends StatefulWidget {
-  final ScanFile file;
+class MultiPageCropWidget extends StatefulWidget {
+  final ScanFile file; // Передаётся объект с списком страниц
 
-  const CropWidget({super.key, required this.file});
+  const MultiPageCropWidget({Key? key, required this.file}) : super(key: key);
 
   @override
-  State<CropWidget> createState() => CropWidgetState();
+  State<MultiPageCropWidget> createState() => MultiPageCropWidgetState();
 }
 
-class CropWidgetState extends State<CropWidget> {
-  // Размеры изображения (в пикселях), полученные из файла
+class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
+  // Индекс текущей страницы
+  int _currentPageIndex = 0;
+  // Контроллер для PageView (вертикальная прокрутка)
+  late PageController _pageController;
+
+  // Размеры изображения (в пикселях) для текущей страницы
   int _imageWidth = 0;
   int _imageHeight = 0;
 
-  // Флаг инициализации ручек.
+  // Флаг инициализации ручек (для текущей страницы)
   bool _initializedHandles = false;
 
-  // 4 угла обрезаемой области (в координатах виджета)
+  // Координаты углов (в координатах контейнера)
   Offset _topLeft = const Offset(0, 0);
-  Offset _topRight =  Offset(250.w, 50.h);
-  Offset _bottomLeft =  Offset(50.w, 350.h);
-  Offset _bottomRight =  Offset(250.w, 350.h);
+  Offset _topRight = Offset(250.w, 50.h);
+  Offset _bottomLeft = Offset(50.w, 350.h);
+  Offset _bottomRight = Offset(250.w, 350.h);
 
-  /// Константы для размеров ручек и области нажатия.
+  // Константы для ручек
   static final double cornerSize = 13.w;
   static final Size horizontalSize = Size(39.w, 6.h);
   static final Size verticalSize = Size(6.w, 39.h);
-  static final double hitSize = 44.w; // Минимальная область нажатия
+  static final double hitSize = 44.w;
 
-  // Какую ручку сейчас тащим
   _HandlePosition? _draggingHandle;
-
-  // Запоминаем позицию пальца при начале перетаскивания
   Offset _initialDragOffset = Offset.zero;
+  late Offset _initialTopLeft, _initialTopRight, _initialBottomLeft, _initialBottomRight;
 
-  // Запоминаем положения углов при начале перетаскивания
-  late Offset _initialTopLeft,
-      _initialTopRight,
-      _initialBottomLeft,
-      _initialBottomRight;
-
-  // Для вычислений обрезки
+  // Размер контейнера (рабочей области)
   Size _containerSize = Size.zero;
   LocalKey imageKey = UniqueKey();
 
   @override
   void initState() {
     super.initState();
+    _pageController = PageController(initialPage: 0);
+    // Загружаем размеры для первой страницы
     _loadImageSize();
   }
 
-  /// Считываем исходное изображение, чтобы узнать его реальные размеры.
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  /// Загружаем размеры изображения для текущей страницы
   Future<void> _loadImageSize() async {
     try {
-      final filePath = widget.file.path;
-      if (filePath == null || filePath.isEmpty) return;
-
-      final fileBytes = await File(filePath).readAsBytes();
+      final pagePath = widget.file.pages[_currentPageIndex];
+      if (pagePath.isEmpty) return;
+      final fileBytes = await File(pagePath).readAsBytes();
       final decoded = img.decodeImage(fileBytes);
       if (decoded == null) return;
-
       setState(() {
         _imageWidth = decoded.width;
         _imageHeight = decoded.height;
@@ -83,49 +84,38 @@ class CropWidgetState extends State<CropWidget> {
     }
   }
 
-  /// Метод обрезки и сохранения (вызывается при смене режима).
+  /// Сохраняем обрезку для текущей страницы
   Future<void> saveCrop() async {
-    final path = widget.file.path;
-    if (path == null || path.isEmpty) {
-      debugPrint('Файл не задан или путь пуст');
+    final pagePath = widget.file.pages[_currentPageIndex];
+    if (pagePath.isEmpty) {
+      debugPrint('Путь к изображению пустой');
       return;
     }
-
-    // Если не знаем исходные размеры, нет смысла обрезать
     if (_imageWidth == 0 || _imageHeight == 0) {
       debugPrint('Размеры изображения неизвестны (0x0)');
       return;
     }
-
-    final file = File(path);
+    final file = File(pagePath);
     if (!await file.exists()) {
-      debugPrint('Файл не найден: $path');
+      debugPrint('Файл не найден: $pagePath');
       return;
     }
-
     try {
-      // 1. Читаем изображение
       final fileBytes = await file.readAsBytes();
       final original = img.decodeImage(fileBytes);
       if (original == null) {
         debugPrint('Не удалось декодировать изображение');
         return;
       }
-
-      // 2. Вычисляем прямоугольник обрезки (bounding box) в пикселях исходного изображения
       final cropRect = _calculateRealCropRect(
         containerSize: _containerSize,
         imageWidth: _imageWidth,
         imageHeight: _imageHeight,
       );
-
-      // Чтобы избежать отрицательных размеров, проверим ещё раз
       if (cropRect.width <= 0 || cropRect.height <= 0) {
         debugPrint('Некорректные размеры обрезки: $cropRect');
         return;
       }
-
-      // 3. Обрезаем
       final cropped = img.copyCrop(
         original,
         x: cropRect.left.toInt(),
@@ -133,17 +123,12 @@ class CropWidgetState extends State<CropWidget> {
         width: cropRect.width.toInt(),
         height: cropRect.height.toInt(),
       );
-
-      // 4. Кодируем в PNG (можно в JPG — тогда используйте encodeJpg)
       final newBytes = img.encodePng(cropped);
-
-      // 5. Перезаписываем файл
       await file.writeAsBytes(newBytes);
-
-      debugPrint('Обрезка сохранена в тот же файл: $path');
+      debugPrint('Обрезка для страницы $_currentPageIndex сохранена');
       imageCache.clear();
       imageCache.clearLiveImages();
-      final fileImage = FileImage(File(path));
+      final fileImage = FileImage(File(pagePath));
       await fileImage.evict();
       setState(() {});
     } catch (e) {
@@ -151,8 +136,7 @@ class CropWidgetState extends State<CropWidget> {
     }
   }
 
-  /// Переводим координаты 4 углов в координаты исходного изображения (пиксели).
-  /// Берём bounding box из четырёх точек и возвращаем [Rect].
+  /// Переводим координаты ручек в реальные координаты исходного изображения
   Rect _calculateRealCropRect({
     required Size containerSize,
     required int imageWidth,
@@ -161,50 +145,37 @@ class CropWidgetState extends State<CropWidget> {
     if (containerSize.width == 0 || containerSize.height == 0) {
       return const Rect.fromLTWH(0, 0, 0, 0);
     }
-
     final widgetAspect = containerSize.width / containerSize.height;
     final imageAspect = imageWidth / imageHeight.toDouble();
-
     double scale;
     double offsetX = 0;
     double offsetY = 0;
-
-    // Считаем, как вписан оригинал в контейнер при BoxFit.contain
     if (imageAspect > widgetAspect) {
-      // Изображение "шире", чем контейнер
       scale = containerSize.width / imageWidth;
       final realHeight = imageHeight * scale;
       offsetY = (containerSize.height - realHeight) / 2;
     } else {
-      // Изображение "выше" или пропорции равны
       scale = containerSize.height / imageHeight;
       final realWidth = imageWidth * scale;
       offsetX = (containerSize.width - realWidth) / 2;
     }
-
-    // Функция перевода координат
     Offset toImageCoords(Offset screenOffset) {
       final dx = (screenOffset.dx - offsetX) / scale;
       final dy = (screenOffset.dy - offsetY) / scale;
       return Offset(dx, dy);
     }
-
     final p1 = toImageCoords(_topLeft);
     final p2 = toImageCoords(_topRight);
     final p3 = toImageCoords(_bottomLeft);
     final p4 = toImageCoords(_bottomRight);
-
-    // Ищем bounding box
     final minX = math.min(math.min(p1.dx, p2.dx), math.min(p3.dx, p4.dx));
     final maxX = math.max(math.max(p1.dx, p2.dx), math.max(p3.dx, p4.dx));
     final minY = math.min(math.min(p1.dy, p2.dy), math.min(p3.dy, p4.dy));
     final maxY = math.max(math.max(p1.dy, p2.dy), math.max(p3.dy, p4.dy));
-
     final left = math.max(0, minX).toDouble();
     final top = math.max(0, minY).toDouble();
     final right = math.min(imageWidth.toDouble(), maxX);
     final bottom = math.min(imageHeight.toDouble(), maxY);
-
     return Rect.fromLTRB(left, top, right, bottom);
   }
 
@@ -235,18 +206,27 @@ class CropWidgetState extends State<CropWidget> {
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final imagePath = widget.file.path;
-    if (imagePath == null || imagePath.isEmpty) {
-      return const Center(child: Text('Нет пути к изображению'));
-    }
+  /// При переходе на новую страницу: сохраняем обрезку текущей страницы,
+  /// сбрасываем состояния и загружаем размеры нового изображения.
+  Future<void> _onPageChanged(int newPage) async {
+    // Сохраняем текущую страницу
+    await saveCrop();
+    setState(() {
+      _currentPageIndex = newPage;
+      _initializedHandles = false;
+      _imageWidth = 0;
+      _imageHeight = 0;
+    });
+    await _loadImageSize();
+  }
 
+  /// Строим UI для обрезки текущей страницы (общая логика для одной страницы)
+  Widget _buildCropUI(String imagePath) {
     return DeferredPointerHandler(
       child: LayoutBuilder(
         builder: (context, constraints) {
           return Padding(
-            padding:  EdgeInsets.only(
+            padding: EdgeInsets.only(
               left: 16.w,
               right: 16.w,
               top: 24.h,
@@ -254,14 +234,7 @@ class CropWidgetState extends State<CropWidget> {
             ),
             child: LayoutBuilder(
               builder: (ctx, innerConstraints) {
-                // Размер «рабочей» области (после Padding)
-                _containerSize = Size(
-                  innerConstraints.maxWidth,
-                  innerConstraints.maxHeight,
-                );
-
-                // Если ручки ещё не инициализированы и размеры изображения уже загружены,
-                // вычисляем прямоугольник, в котором отрисовано изображение, и устанавливаем углы.
+                _containerSize = Size(innerConstraints.maxWidth, innerConstraints.maxHeight);
                 if (!_initializedHandles && _imageWidth != 0 && _imageHeight != 0) {
                   final imageRect = _getImageRect(_containerSize);
                   WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -274,10 +247,9 @@ class CropWidgetState extends State<CropWidget> {
                     });
                   });
                 }
-
                 return Stack(
                   children: [
-                    // 1) Само изображение
+                    // Само изображение
                     Positioned.fill(
                       child: Image.file(
                         File(imagePath),
@@ -285,7 +257,7 @@ class CropWidgetState extends State<CropWidget> {
                         fit: BoxFit.contain,
                       ),
                     ),
-                    // 2) Рисуем затемнение + рамку
+                    // Затемнение и рамка
                     Positioned.fill(
                       child: CustomPaint(
                         painter: _CropPainter(
@@ -296,9 +268,9 @@ class CropWidgetState extends State<CropWidget> {
                         ),
                       ),
                     ),
-                    // 3) Генерируем 8 ручек (4 угла + 4 стороны)
+                    // Ручки
                     ..._buildAllHandles(),
-                    // Можно добавить кнопки, кнопки «Сохранить» и т.д.
+                    // Дополнительные элементы (например, кнопки сохранения) можно добавить здесь
                   ],
                 );
               },
@@ -309,7 +281,7 @@ class CropWidgetState extends State<CropWidget> {
     );
   }
 
-  /// Создаём все 8 ручек.
+  /// Создаём 8 ручек
   List<Widget> _buildAllHandles() {
     return [
       _buildHandle(_HandlePosition.topLeft),
@@ -323,30 +295,23 @@ class CropWidgetState extends State<CropWidget> {
     ];
   }
 
-  /// Создаём конкретную ручку с новым дизайном, привязанную к границам изображения.
   Widget _buildHandle(_HandlePosition pos) {
-    // Определяем тип ручки в зависимости от позиции
     late HandleType type;
     if (pos == _HandlePosition.topLeft ||
         pos == _HandlePosition.topRight ||
         pos == _HandlePosition.bottomLeft ||
         pos == _HandlePosition.bottomRight) {
       type = HandleType.corner;
-    } else if (pos == _HandlePosition.topCenter ||
-        pos == _HandlePosition.bottomCenter) {
+    } else if (pos == _HandlePosition.topCenter || pos == _HandlePosition.bottomCenter) {
       type = HandleType.horizontal;
     } else {
       type = HandleType.vertical;
     }
-
-    // Вычисляем положение центра ручки
     final offset = _getHandleOffset(pos);
-
-    // Определяем визуальный размер ручки в зависимости от типа
     late Size visualSize;
     switch (type) {
       case HandleType.corner:
-        visualSize =  Size(cornerSize, cornerSize);
+        visualSize = Size(cornerSize, cornerSize);
         break;
       case HandleType.horizontal:
         visualSize = horizontalSize;
@@ -355,10 +320,8 @@ class CropWidgetState extends State<CropWidget> {
         visualSize = verticalSize;
         break;
     }
-    // Вычисляем размер области нажатия
     final double hitW = math.max(visualSize.width, hitSize);
     final double hitH = math.max(visualSize.height, hitSize);
-
     return Positioned(
       left: offset.dx - hitW / 2,
       top: offset.dy - hitH / 2,
@@ -366,14 +329,12 @@ class CropWidgetState extends State<CropWidget> {
       height: hitH,
       child: DeferPointer(
         link: null,
-        // Здесь можно задать ссылку для отложенного распознавания указателей
         paintOnTop: true,
         child: GestureDetector(
           onPanStart: (details) {
             setState(() {
               _draggingHandle = pos;
               _initialDragOffset = details.globalPosition;
-              // Запоминаем исходные координаты углов
               _initialTopLeft = _topLeft;
               _initialTopRight = _topRight;
               _initialBottomLeft = _bottomLeft;
@@ -401,7 +362,6 @@ class CropWidgetState extends State<CropWidget> {
               width: visualSize.width,
               height: visualSize.height,
               decoration: () {
-                // Оформление ручки в зависимости от типа
                 switch (type) {
                   case HandleType.corner:
                     return BoxDecoration(
@@ -430,7 +390,6 @@ class CropWidgetState extends State<CropWidget> {
     );
   }
 
-  /// Получаем "экранные" координаты ручки (середина кружка)
   Offset _getHandleOffset(_HandlePosition pos) {
     switch (pos) {
       case _HandlePosition.topLeft:
@@ -441,40 +400,23 @@ class CropWidgetState extends State<CropWidget> {
         return _bottomLeft;
       case _HandlePosition.bottomRight:
         return _bottomRight;
-
       case _HandlePosition.topCenter:
-        return Offset(
-          (_topLeft.dx + _topRight.dx) / 2,
-          (_topLeft.dy + _topRight.dy) / 2,
-        );
+        return Offset((_topLeft.dx + _topRight.dx) / 2, (_topLeft.dy + _topRight.dy) / 2);
       case _HandlePosition.bottomCenter:
-        return Offset(
-          (_bottomLeft.dx + _bottomRight.dx) / 2,
-          (_bottomLeft.dy + _bottomRight.dy) / 2,
-        );
+        return Offset((_bottomLeft.dx + _bottomRight.dx) / 2, (_bottomLeft.dy + _bottomRight.dy) / 2);
       case _HandlePosition.leftCenter:
-        return Offset(
-          (_topLeft.dx + _bottomLeft.dx) / 2,
-          (_topLeft.dy + _bottomLeft.dy) / 2,
-        );
+        return Offset((_topLeft.dx + _bottomLeft.dx) / 2, (_topLeft.dy + _bottomLeft.dy) / 2);
       case _HandlePosition.rightCenter:
-        return Offset(
-          (_topRight.dx + _bottomRight.dx) / 2,
-          (_topRight.dy + _bottomRight.dy) / 2,
-        );
+        return Offset((_topRight.dx + _bottomRight.dx) / 2, (_topRight.dy + _bottomRight.dy) / 2);
     }
   }
 
-  /// Меняем координаты углов в зависимости от того, какую ручку тащим.
   void _updateOffsets(_HandlePosition pos, double dx, double dy) {
-    // Начинаем с исходных положений (зафиксированных в onPanStart)
     Offset tl = _initialTopLeft;
     Offset tr = _initialTopRight;
     Offset bl = _initialBottomLeft;
     Offset br = _initialBottomRight;
-
     switch (pos) {
-      // Углы
       case _HandlePosition.topLeft:
         tl = tl.translate(dx, dy);
         break;
@@ -487,53 +429,67 @@ class CropWidgetState extends State<CropWidget> {
       case _HandlePosition.bottomRight:
         br = br.translate(dx, dy);
         break;
-
-      // Середины сторон
       case _HandlePosition.topCenter:
-        // Перемещаем только по оси Y верхние углы
         tl = tl.translate(0, dy);
         tr = tr.translate(0, dy);
         break;
       case _HandlePosition.bottomCenter:
-        // Перемещаем только по оси Y нижние углы
         bl = bl.translate(0, dy);
         br = br.translate(0, dy);
         break;
       case _HandlePosition.leftCenter:
-        // Перемещаем только по оси X левые углы
         tl = tl.translate(dx, 0);
         bl = bl.translate(dx, 0);
         break;
       case _HandlePosition.rightCenter:
-        // Перемещаем только по оси X правые углы
         tr = tr.translate(dx, 0);
         br = br.translate(dx, 0);
         break;
     }
-
-    // Здесь можно вставить проверки, чтобы не уходить за границы.
-    // Например:
     tl = _clampToArea(tl);
+    tr = _clampToArea(tr);
     bl = _clampToArea(bl);
     br = _clampToArea(br);
-    tr = _clampToArea(tr);
-    // ... итд
-
     _topLeft = tl;
     _topRight = tr;
     _bottomLeft = bl;
     _bottomRight = br;
   }
 
-  /// При желании ограничивать движение в пределах [0.._containerSize].
   Offset _clampToArea(Offset p) {
     final x = p.dx.clamp(0, _containerSize.width);
     final y = p.dy.clamp(0, _containerSize.height);
     return Offset(x.toDouble(), y.toDouble());
   }
+
+  @override
+  Widget build(BuildContext context) {
+    // Если файл содержит одну страницу, используем обычный режим (без PageView)
+    if (widget.file.pages.length <= 1) {
+      return _buildCropUI(widget.file.pages.first);
+    }
+
+    // Если многостраничный режим: PageView с вертикальной прокруткой
+    return PageView.builder(
+      controller: _pageController,
+      scrollDirection: Axis.vertical,
+      itemCount: widget.file.pages.length,
+      onPageChanged: (newPage) async {
+        await _onPageChanged(newPage);
+      },
+      itemBuilder: (context, index) {
+        // Если текущая страница отличается от index,
+        // можно показать либо состояние "загружается" (если !_initializedHandles)
+        // либо саму crop-область для этой страницы.
+        // Здесь для простоты всегда вызываем _buildCropUI для страницы по индексу.
+        // При переключении состояние пересчитывается (_initializedHandles сброшен).
+        return _buildCropUI(widget.file.pages[index]);
+      },
+    );
+  }
 }
 
-/// 8 позиций «ручек»
+/// Перечисление позиций ручек
 enum _HandlePosition {
   topLeft,
   topCenter,
@@ -545,9 +501,9 @@ enum _HandlePosition {
   leftCenter,
 }
 
-////
-/// CustomPainter, который рисует затемнение и рамку по четырём углам.
-///
+enum HandleType { corner, horizontal, vertical }
+
+/// CustomPainter для отрисовки затемнения и рамки
 class _CropPainter extends CustomPainter {
   final Offset topLeft;
   final Offset topRight;
@@ -570,26 +526,21 @@ class _CropPainter extends CustomPainter {
       ..color = AppColors.blueLight
       ..strokeWidth = 2
       ..style = PaintingStyle.stroke;
-
     final fullRect = Rect.fromLTWH(0, 0, size.width, size.height);
-    // затемнение
-    withShadow ? canvas.drawRect(fullRect, paintOverlay) : null;
-
+    if (withShadow) {
+      canvas.drawRect(fullRect, paintOverlay);
+    }
     final cropPath = Path()
       ..moveTo(topLeft.dx, topLeft.dy)
       ..lineTo(topRight.dx, topRight.dy)
       ..lineTo(bottomRight.dx, bottomRight.dy)
       ..lineTo(bottomLeft.dx, bottomLeft.dy)
       ..close();
-
-    // «Вырезаем» обрезаемую область
     canvas.saveLayer(Rect.largest, Paint());
     canvas.drawRect(fullRect, paintOverlay);
     final clearPaint = Paint()..blendMode = BlendMode.dstOut;
     canvas.drawPath(cropPath, clearPaint);
     canvas.restore();
-
-    // Рисуем белую рамку
     canvas.drawPath(cropPath, paintBorder);
   }
 

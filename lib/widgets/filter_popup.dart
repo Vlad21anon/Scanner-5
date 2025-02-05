@@ -24,7 +24,7 @@ class _FilterPopupState extends State<FilterPopup> {
   Widget build(BuildContext context) {
     return Container(
         width: 260,
-        height: 315,
+        height: 320,
         padding: EdgeInsets.all(16.r),
         decoration: BoxDecoration(
           color: Colors.white,
