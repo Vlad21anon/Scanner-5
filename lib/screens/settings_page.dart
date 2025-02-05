@@ -4,7 +4,10 @@ import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
 import 'package:owl_tech_pdf_scaner/app/app_icons.dart';
 import 'package:owl_tech_pdf_scaner/app/app_text_style.dart';
 import 'package:owl_tech_pdf_scaner/gen/assets.gen.dart';
+import 'package:owl_tech_pdf_scaner/screens/subscription_selection_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+import '../services/navigation_service.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -30,8 +33,8 @@ class SettingsScreen extends StatelessWidget {
             SizedBox(height: 16.h),
             GestureDetector(
               onTap: () async {
-                // Переход на страницу поддержки
-                await _openUrl('https://pdf-scanner.lovable.app/');
+                final navigation = NavigationService();
+                navigation.navigateTo(context, SubscriptionSelectionScreen());
               },
               child: Assets.images.unlock.image(
                 height: 143.h,
