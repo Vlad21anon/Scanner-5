@@ -12,26 +12,28 @@ import 'file_popup.dart';
 
 class FileCard extends StatelessWidget {
   final ScanFile file;
+
   /// Новый параметр для передачи конкретного пути к изображению (например, для мультистраничного файла)
   final String? imagePath;
   final VoidCallback onTap;
-  final VoidCallback onLongPress;
-  final bool isSelectedMode;
+  final VoidCallback? onLongPress;
+  final bool? isSelectedMode;
 
   const FileCard({
     super.key,
     required this.file,
     required this.onTap,
-    required this.onLongPress,
-    required this.isSelectedMode,
+    this.onLongPress,
+    this.isSelectedMode,
     this.imagePath,
   });
 
   @override
   Widget build(BuildContext context) {
     // Если imagePath передан и не пустой, используем его, иначе берем file.path
-    final displayImagePath =
-    (imagePath != null && imagePath!.isNotEmpty) ? imagePath! : file.pages.first;
+    final displayImagePath = (imagePath != null && imagePath!.isNotEmpty)
+        ? imagePath!
+        : file.pages.first;
 
     return GestureDetector(
       onTap: onTap,
@@ -100,7 +102,7 @@ class FileCard extends StatelessWidget {
             GestureDetector(
               onTap: () {
                 final RenderBox button =
-                context.findRenderObject() as RenderBox;
+                    context.findRenderObject() as RenderBox;
                 final Offset position = button.localToGlobal(Offset.zero);
 
                 showDialog(
@@ -132,28 +134,28 @@ class FileCard extends StatelessWidget {
               ),
             ),
             SizedBox(width: 8.w),
-            if (isSelectedMode)
+            if (isSelectedMode ?? false)
               file.isSelected
                   ? Container(
-                height: 40.h,
-                width: 40.w,
-                color: Colors.transparent,
-                child: Center(
-                  child: FittedBox(
-                    child: AppIcons.circleBlue24x24,
-                  ),
-                ),
-              )
+                      height: 40.h,
+                      width: 40.w,
+                      color: Colors.transparent,
+                      child: Center(
+                        child: FittedBox(
+                          child: AppIcons.circleBlue24x24,
+                        ),
+                      ),
+                    )
                   : Container(
-                width: 40.w,
-                height: 40.h,
-                color: Colors.transparent,
-                child: Center(
-                  child: FittedBox(
-                    child: AppIcons.circleBorderlessGreyIcon24x24,
-                  ),
-                ),
-              ),
+                      width: 40.w,
+                      height: 40.h,
+                      color: Colors.transparent,
+                      child: Center(
+                        child: FittedBox(
+                          child: AppIcons.circleBorderlessGreyIcon24x24,
+                        ),
+                      ),
+                    ),
           ],
         ),
       ),

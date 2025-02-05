@@ -249,10 +249,14 @@ class _ScanScreenState extends State<ScanScreen> {
                       // Кнопка "сделать снимок"
                       GestureDetector(
                         onTap: () => _takePhoto(context),
-                        child: Assets.images.shutter.image(
-                          width: 72.w,
-                          height: 72.w,
-                          fit: BoxFit.cover,
+                        child: Container(
+                          padding: EdgeInsets.all(6.w),
+                          color: Colors.transparent,
+                          child: Assets.images.shutter.image(
+                            width: 72.w,
+                            height: 72.w,
+                            fit: BoxFit.cover,
+                          ),
                         ),
                       ),
 

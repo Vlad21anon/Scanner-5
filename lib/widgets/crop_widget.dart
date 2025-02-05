@@ -6,7 +6,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image/image.dart' as img;
 import 'package:owl_tech_pdf_scaner/app/app_text_style.dart';
 import 'package:owl_tech_pdf_scaner/models/scan_file.dart';
-import 'package:owl_tech_pdf_scaner/widgets/resizable_note.dart'; // если используется
 import '../app/app_colors.dart';
 
 ///
@@ -14,8 +13,9 @@ import '../app/app_colors.dart';
 ///
 class MultiPageCropWidget extends StatefulWidget {
   final ScanFile file; // Передаётся объект с списком страниц
+  final int? index;
 
-  const MultiPageCropWidget({super.key, required this.file});
+  const MultiPageCropWidget({super.key, required this.file, this.index});
 
   @override
   State<MultiPageCropWidget> createState() => MultiPageCropWidgetState();
@@ -61,7 +61,8 @@ class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(initialPage: 0);
+    _pageController = PageController(initialPage: widget.index ?? 0);
+    _currentPageIndex = widget.index ?? 0;
     // Загружаем размеры для первой страницы
     _loadImageSize();
   }
@@ -70,6 +71,12 @@ class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
   void dispose() {
     _pageController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _currentPageIndex = widget.index ?? 0;
   }
 
   /// Загружаем размеры изображения для текущей страницы

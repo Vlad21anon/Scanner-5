@@ -162,6 +162,7 @@ class _FilesPageState extends State<FilesPage> {
                           ),
                   ),
                 ),
+                SizedBox(height: 16.h),
               ],
             );
           },

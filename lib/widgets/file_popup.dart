@@ -3,22 +3,52 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:owl_tech_pdf_scaner/app/app_icons.dart';
 import 'package:owl_tech_pdf_scaner/models/scan_file.dart';
+import 'package:owl_tech_pdf_scaner/services/navigation_service.dart';
 
 import '../app/app_shadows.dart';
 import '../app/app_text_style.dart';
 import '../blocs/files_cubit.dart';
+import '../screens/subscription_selection_screen.dart';
 import '../services/file_share_service.dart';
+import '../services/revenuecat_service.dart';
 
 class FilePopup extends StatelessWidget {
   final ScanFile file;
 
   const FilePopup({super.key, required this.file});
 
+
+  Future<bool> _showSubscriptionDialog(BuildContext context) async {
+    // Проверяем наличие активной подписки через RevenueCat
+    bool hasSubscription = await RevenueCatService().isUserSubscribed();
+
+    if (hasSubscription) {
+      // Если подписка активна, разрешаем использовать режим Pen
+      return true;
+    } else {
+      // Если подписки нет, переходим на экран подписки
+      NavigationService().navigateTo(context, SubscriptionSelectionScreen());
+      return false;
+    }
+  }
+
   /// Функция для создания PDF-файла из аннотированного изображения и его шаринга
   Future<void> _sharePdfFile() async {
     try {
       await FileShareService.shareFileAsPdf(file, text: 'Ваш PDF файл');
+    } catch (e) {
+      debugPrint("Ошибка при создании или шаринге PDF: $e");
+    }
+  }
 
+  /// Функция для создания PDF-файла из аннотированного изображения и его шаринга
+  Future<void> _showSubscriptionDialogOrShare(BuildContext context) async {
+    try {
+      final state = await _showSubscriptionDialog(context);
+
+      if(state) {
+        _sharePdfFile();
+      }
     } catch (e) {
       debugPrint("Ошибка при создании или шаринге PDF: $e");
     }
@@ -58,7 +88,7 @@ class FilePopup extends StatelessWidget {
               ),
                SizedBox(height: 16.h),
               _buildMenuItem(
-                onTap: _sharePdfFile,
+                onTap: () => _showSubscriptionDialogOrShare(context),
                 title: 'Share',
                 icon: AppIcons.share14x16,
               ),

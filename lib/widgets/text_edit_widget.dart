@@ -8,11 +8,13 @@ import 'package:owl_tech_pdf_scaner/app/app_text_style.dart';
 import 'package:owl_tech_pdf_scaner/widgets/сustom_slider.dart';
 import 'editable_movable_text.dart';
 import '../models/scan_file.dart';
+import 'package:image/image.dart' as img;
 
 class TextEditWidget extends StatefulWidget {
   final ScanFile file;
+  final int? index;
 
-  const TextEditWidget({super.key, required this.file});
+  const TextEditWidget({super.key, required this.file, this.index});
 
   @override
   State<TextEditWidget> createState() => TextEditWidgetState();
@@ -28,9 +30,8 @@ class TextEditWidgetState extends State<TextEditWidget> {
   LocalKey imageKey = UniqueKey();
   final GlobalKey<EditableMovableResizableTextState> textEditKey = GlobalKey();
 
-  // Если лишних смещений не нужно, устанавливаем их в 0
-  double textShiftX = 0;
-  double textShiftY = 0;
+  int _imageWidth = 0;
+  int _imageHeight = 0;
 
   // Для многостраничного режима:
   int _currentPageIndex = 0;
@@ -39,7 +40,53 @@ class TextEditWidgetState extends State<TextEditWidget> {
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(initialPage: 0);
+    _pageController = PageController(initialPage: widget.index ?? 0);
+    _currentPageIndex = widget.index ?? 0;
+    _loadImageSize();
+  }
+
+  /// Метод для загрузки размеров изображения (например, из файла)
+  Future<void> _loadImageSize() async {
+    final String path = widget
+        .file.pages[_currentPageIndex]; // или другой способ получения пути
+    if (path.isEmpty) return;
+    final fileBytes = await File(path).readAsBytes();
+    final decoded = img.decodeImage(fileBytes);
+    if (decoded != null) {
+      setState(() {
+        _imageWidth = decoded.width;
+        _imageHeight = decoded.height;
+      });
+    }
+  }
+
+  /// Вычисляет прямоугольник, в котором реально отрисовывается изображение
+  /// внутри контейнера с заданными размерами (с учетом BoxFit.contain).
+  /// [containerSize] – размеры контейнера (например, 361.w x 491.h),
+  /// [originalWidth] и [originalHeight] – реальные размеры исходного изображения.
+  Rect _getImageRectForOriginal(
+      Size containerSize, int originalWidth, int originalHeight) {
+    if (originalWidth == 0 || originalHeight == 0) {
+      return Rect.fromLTWH(0, 0, containerSize.width, containerSize.height);
+    }
+    final double containerAspect = containerSize.width / containerSize.height;
+    final double imageAspect = originalWidth / originalHeight;
+    double scale;
+    double offsetX = 0;
+    double offsetY = 0;
+    if (imageAspect > containerAspect) {
+      // Изображение шире контейнера: масштабируем по ширине.
+      scale = containerSize.width / originalWidth;
+      final double realHeight = originalHeight * scale;
+      offsetY = (containerSize.height - realHeight) / 2;
+      return Rect.fromLTWH(0, offsetY, containerSize.width, realHeight);
+    } else {
+      // Изображение выше контейнера: масштабируем по высоте.
+      scale = containerSize.height / originalHeight;
+      final double realWidth = originalWidth * scale;
+      offsetX = (containerSize.width - realWidth) / 2;
+      return Rect.fromLTWH(offsetX, 0, realWidth, containerSize.height);
+    }
   }
 
   void updateImage(LocalKey key) {
@@ -184,38 +231,41 @@ class TextEditWidgetState extends State<TextEditWidget> {
             // Если многостраничный режим – используем PageView
             multiPage
                 ? Stack(
-              children: [
-                // Основной виджет PageView
-                PageView.builder(
-                  controller: _pageController,
-                  scrollDirection: Axis.vertical,
-                  itemCount: widget.file.pages.length,
-                  onPageChanged: _onPageChanged,
-                  itemBuilder: (context, index) {
-                    return _buildTextAnnotationUI(widget.file.pages[index]);
-                  },
-                ),
-                // Отображение номера текущей страницы внизу
-                Positioned(
-                  bottom: 90.h, // отступ от нижнего края (можно регулировать)
-                  left: 0,
-                  right: 0,
-                  child: Center(
-                    child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12.r),
+                    children: [
+                      // Основной виджет PageView
+                      PageView.builder(
+                        controller: _pageController,
+                        scrollDirection: Axis.vertical,
+                        itemCount: widget.file.pages.length,
+                        onPageChanged: _onPageChanged,
+                        itemBuilder: (context, index) {
+                          return _buildTextAnnotationUI(
+                              widget.file.pages[index]);
+                        },
                       ),
-                      child: Text(
-                        "${_currentPageIndex + 1} / ${widget.file.pages.length}",
-                        style: AppTextStyle.exo20,
+                      // Отображение номера текущей страницы внизу
+                      Positioned(
+                        bottom:
+                            90.h, // отступ от нижнего края (можно регулировать)
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 12.w, vertical: 6.h),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12.r),
+                            ),
+                            child: Text(
+                              "${_currentPageIndex + 1} / ${widget.file.pages.length}",
+                              style: AppTextStyle.exo20,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                ),
-              ],
-            )
+                    ],
+                  )
                 : _buildTextAnnotationUI(widget.file.pages.first),
             // Панель с настройками (DraggableScrollableSheet)
             DraggableScrollableSheet(
@@ -362,7 +412,7 @@ class TextEditWidgetState extends State<TextEditWidget> {
     final String path = widget.file.pages.length > 1
         ? widget.file.pages[_currentPageIndex]
         : widget.file.pages.first;
-    if (path.isEmpty || _text.isEmpty || _text == '') return;
+    if (path.isEmpty || _text.isEmpty) return;
     final file = File(path);
     if (!await file.exists()) return;
     try {
@@ -372,15 +422,35 @@ class TextEditWidgetState extends State<TextEditWidget> {
       final ui.Image originalImage = frameInfo.image;
       final int originalWidth = originalImage.width;
       final int originalHeight = originalImage.height;
-      final double displayedWidth = 361.w;
-      final double displayedHeight = 491.h;
-      final double scaleX = originalWidth / displayedWidth;
-      final double scaleY = originalHeight / displayedHeight;
+
+      // Размеры контейнера, в котором отображается изображение (как в макете)
+      final double containerWidth = 361.w;
+      final double containerHeight = 491.h;
+      final Size containerSize = Size(containerWidth, containerHeight);
+
+      // Вычисляем прямоугольник, в котором реально отрисовывается изображение с BoxFit.contain
+      final Rect imageRect = _getImageRectForOriginal(
+        containerSize,
+        containerWidth.toInt(),
+        containerHeight.toInt(),
+      );
+
+      // Масштаб относительно реально отрисованного изображения
+      final double scaleX = originalWidth / imageRect.width;
+      final double scaleY = originalHeight / imageRect.height;
+
+      // Корректируем положение текста: _textOffset задан относительно всего контейнера,
+      // поэтому вычитаем смещение (imageRect.topLeft)
+      final Offset adjustedOffset = _textOffset - imageRect.topLeft;
+      final double drawX = adjustedOffset.dx * scaleX;
+      final double drawY = adjustedOffset.dy * scaleY;
+
       final ui.PictureRecorder recorder = ui.PictureRecorder();
       final Canvas canvas = Canvas(recorder);
+      // Рисуем оригинальное изображение
       canvas.drawImage(originalImage, Offset.zero, Paint());
-      final double drawX = _textOffset.dx * scaleX;
-      final double drawY = _textOffset.dy * scaleY;
+
+      // Создаём TextSpan с учетом масштабирования (умножаем размер шрифта на scaleX)
       final textSpan = TextSpan(
         text: _text,
         style: TextStyle(fontSize: _fontSize * scaleX, color: _textColor),
@@ -389,8 +459,10 @@ class TextEditWidgetState extends State<TextEditWidget> {
         text: textSpan,
         textDirection: TextDirection.ltr,
       );
-      textPainter.layout(maxWidth: displayedWidth * scaleX);
+      // Ограничиваем ширину текстового блока равной ширине отрисованного изображения
+      textPainter.layout(maxWidth: imageRect.width * scaleX);
       textPainter.paint(canvas, Offset(drawX, drawY));
+
       final ui.Picture picture = recorder.endRecording();
       final ui.Image finalImage =
           await picture.toImage(originalWidth, originalHeight);

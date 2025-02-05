@@ -14,6 +14,7 @@ import 'package:owl_tech_pdf_scaner/widgets/custom_circular_button.dart';
 import 'package:owl_tech_pdf_scaner/widgets/handwriting_painter.dart';
 import 'package:owl_tech_pdf_scaner/widgets/сustom_slider.dart';
 import 'package:owl_tech_pdf_scaner/widgets/resizable_note.dart';
+import 'package:image/image.dart' as img;
 
 import '../blocs/signatures_cubit.dart';
 
@@ -21,8 +22,9 @@ class PenEditWidget extends StatefulWidget {
   // Для поддержки нескольких файлов (или страниц) можно использовать поле pages,
   // а если файлов один, то используется path.
   final ScanFile file;
+  final int? index;
 
-  const PenEditWidget({super.key, required this.file});
+  const PenEditWidget({super.key, required this.file, this.index});
 
   @override
   State<PenEditWidget> createState() => PenEditWidgetState();
@@ -43,6 +45,10 @@ class PenEditWidgetState extends State<PenEditWidget> {
   double? _displayedWidth;
   double? _displayedHeight;
 
+  // Объявляем размеры изображения.
+  int _imageWidth = 0;
+  int _imageHeight = 0;
+
   // Для поддержки нескольких файлов/страниц
   int _currentPageIndex = 0;
   late PageController _pageController;
@@ -51,9 +57,17 @@ class PenEditWidgetState extends State<PenEditWidget> {
       widget.file.pages.isNotEmpty && widget.file.pages.length > 1;
 
   @override
+  void didChangeDependencies() {
+    _currentPageIndex = widget.index ?? 0;
+    super.didChangeDependencies();
+  }
+
+  @override
   void initState() {
     super.initState();
-    _pageController = PageController(initialPage: 0);
+    _pageController = PageController(initialPage: widget.index ?? 0);
+    _currentPageIndex = widget.index ?? 0;
+    _loadImageSize();
   }
 
   /// Возвращает путь к изображению для текущей страницы.
@@ -544,33 +558,56 @@ class PenEditWidgetState extends State<PenEditWidget> {
       final ui.Image originalImage = frameInfo.image;
       final int originalWidth = originalImage.width;
       final int originalHeight = originalImage.height;
-      // Если размеры контейнера не сохранены, используем значения по умолчанию.
-      final double displayedWidth = _displayedWidth ?? 361.w;
-      final double displayedHeight = _displayedHeight ?? 491.h;
-      final double scaleX = originalWidth / displayedWidth;
-      final double scaleY = originalHeight / displayedHeight;
+
+      // Задаём размеры контейнера, в котором изображение отображается.
+      // Например, в PenEditWidget они заданы как:
+      final double containerWidth = 361.w;
+      final double containerHeight = 491.h;
+      final Size containerSize = Size(containerWidth, containerHeight);
+
+      // Вычисляем прямоугольник, в котором реально отрисовывается изображение с BoxFit.contain
+      final Rect imageRect = _getImageRect(containerSize);
+
+      // Вычисляем коэффициенты масштабирования относительно отрисованного изображения
+      final double scaleX = originalWidth / imageRect.width;
+      final double scaleY = originalHeight / imageRect.height;
+
       final ui.PictureRecorder recorder = ui.PictureRecorder();
       final Canvas canvas = Canvas(recorder);
+
+      // Рисуем оригинальное изображение (на всю его область)
       canvas.drawImage(originalImage, Offset.zero, Paint());
-      // Рисуем каждую сохранённую подпись из кубита
+
+      // Получаем подписанные записи из кубита
       final signatures = context.read<SignaturesCubit>().state;
       for (var note in signatures) {
-        final Offset notePos =
-            Offset(note.offset.dx * scaleX, note.offset.dy * scaleY);
-        final double noteScaleX =
-            (note.size.width / note.baseSize.width) * scaleX;
-        final double noteScaleY =
-            (note.size.height / note.baseSize.height) * scaleY;
+        // note.offset из подписей, как правило, задаётся относительно контейнера.
+        // Чтобы получить координаты относительно изображения, вычтем imageRect.topLeft.
+        final Offset adjustedOffset = note.offset - imageRect.topLeft;
+        final Offset notePos = Offset(
+          adjustedOffset.dx * scaleX,
+          adjustedOffset.dy * scaleY,
+        );
+
+        // Вычисляем масштаб подписи относительно изображения
+        final double noteScaleX = (note.size.width / note.baseSize.width) * scaleX;
+        final double noteScaleY = (note.size.height / note.baseSize.height) * scaleY;
+
+        // Рисуем линии подписи
         for (int i = 0; i < note.points.length - 1; i++) {
           final DrawPoint? current = note.points[i];
           final DrawPoint? next = note.points[i + 1];
           if (current != null && next != null) {
             final Offset p1 = notePos +
-                Offset(current.offset.dx * noteScaleX,
-                    current.offset.dy * noteScaleY);
+                Offset(
+                  current.offset.dx * noteScaleX,
+                  current.offset.dy * noteScaleY,
+                );
             final Offset p2 = notePos +
                 Offset(
-                    next.offset.dx * noteScaleX, next.offset.dy * noteScaleY);
+                  next.offset.dx * noteScaleX,
+                  next.offset.dy * noteScaleY,
+                );
             final double scaledStroke =
                 note.strokeWidth * ((noteScaleX + noteScaleY) / 2);
             final Paint paint = Paint()
@@ -586,11 +623,12 @@ class PenEditWidgetState extends State<PenEditWidget> {
           }
         }
       }
+
       final ui.Picture picture = recorder.endRecording();
       final ui.Image finalImage =
-          await picture.toImage(originalWidth, originalHeight);
+      await picture.toImage(originalWidth, originalHeight);
       final ByteData? finalByteData =
-          await finalImage.toByteData(format: ui.ImageByteFormat.png);
+      await finalImage.toByteData(format: ui.ImageByteFormat.png);
       if (finalByteData == null) return;
       final Uint8List finalBytes = finalByteData.buffer.asUint8List();
       await file.writeAsBytes(finalBytes);
@@ -599,13 +637,53 @@ class PenEditWidgetState extends State<PenEditWidget> {
       final FileImage fileImage = FileImage(file);
       await fileImage.evict();
       setState(() {
+        // После сохранения очищаем временные данные и генерируем новый ключ для обновления превью.
         _currentDrawing.clear();
-        // Очистка подписей, добавленных на экран
         _placedSignatures.clear();
         imageKey = UniqueKey();
       });
     } catch (e) {
       debugPrint('Ошибка при сохранении аннотированного изображения: $e');
+    }
+  }
+
+  /// Метод для загрузки размеров изображения (например, из файла)
+  Future<void> _loadImageSize() async {
+    final String path = widget.file.pages[_currentPageIndex]; // или другой способ получения пути
+    if (path.isEmpty) return;
+    final fileBytes = await File(path).readAsBytes();
+    final decoded = img.decodeImage(fileBytes);
+    if (decoded != null) {
+      setState(() {
+        _imageWidth = decoded.width;
+        _imageHeight = decoded.height;
+      });
+    }
+  }
+
+  // Вычисляет прямоугольник, в котором фактически отрисовывается изображение
+  /// внутри контейнера (с учетом BoxFit.contain).
+  Rect _getImageRect(Size containerSize) {
+    if (_imageWidth == 0 || _imageHeight == 0) {
+      return Rect.fromLTWH(0, 0, containerSize.width, containerSize.height);
+    }
+    final double containerAspect = containerSize.width / containerSize.height;
+    final double imageAspect = _imageWidth / _imageHeight;
+    double scale;
+    double offsetX = 0;
+    double offsetY = 0;
+    if (imageAspect > containerAspect) {
+      // Изображение шире контейнера: масштабируем по ширине.
+      scale = containerSize.width / _imageWidth;
+      final double realHeight = _imageHeight * scale;
+      offsetY = (containerSize.height - realHeight) / 2;
+      return Rect.fromLTWH(0, offsetY, containerSize.width, realHeight);
+    } else {
+      // Изображение выше контейнера: масштабируем по высоте.
+      scale = containerSize.height / _imageHeight;
+      final double realWidth = _imageWidth * scale;
+      offsetX = (containerSize.width - realWidth) / 2;
+      return Rect.fromLTWH(offsetX, 0, realWidth, containerSize.height);
     }
   }
 

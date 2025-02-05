@@ -214,14 +214,54 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
     }
   }
 
+  Map<String, dynamic> cameraImageToMap(CameraImage image) {
+    if (image.planes.isEmpty) {
+      throw Exception("Нет данных в image.planes");
+    }
+    final map = <String, dynamic>{
+      'width': image.width,
+      'height': image.height,
+      'planesCount': image.planes.length,
+      'plane0': {
+        'bytes': List<int>.from(image.planes[0].bytes),
+        'rowStride': image.planes[0].bytesPerRow,
+        'pixelStride': image.planes[0].bytesPerPixel,
+      },
+    };
+
+    if (image.planes.length > 1) {
+      map['plane1'] = {
+        'bytes': List<int>.from(image.planes[1].bytes),
+        'rowStride': image.planes[1].bytesPerRow,
+        'pixelStride': image.planes[1].bytesPerPixel,
+      };
+    }
+
+    if (image.planes.length > 2) {
+      map['plane2'] = {
+        'bytes': List<int>.from(image.planes[2].bytes),
+        'rowStride': image.planes[2].bytesPerRow,
+        'pixelStride': image.planes[2].bytesPerPixel,
+      };
+    }
+
+    return map;
+  }
+
   Future<void> _processCameraImage(CameraImage image) async {
     try {
       _cameraImageSize = Size(image.width.toDouble(), image.height.toDouble());
-      Uint8List pngBytes = convertYUV420ToPNG(image);
-      _lastPngBytes = pngBytes;
 
-      debugPrint(
-          "Начинаем обработку кадра. Размер изображения: ${image.width}x${image.height}");
+      // Преобразуем CameraImage в Map
+      Map<String, dynamic> imageMap = cameraImageToMap(image);
+
+      // Вызываем функцию через compute
+      Uint8List pngBytes = await compute(convertYUV420ToPNGFromMap, imageMap);
+
+      _lastPngBytes = pngBytes;
+      debugPrint("Начинаем обработку кадра. Размер изображения: ${image.width}x${image.height}");
+
+
 
       // Если виджет не виден, нет смысла выполнять дальнейшую обработку
       if (!_isVisible) return;
@@ -282,8 +322,41 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
         'height': _cameraImageSize!.height.toInt(),
       });
     } else {
-      // Если углов не 4, сохраняем изображение как есть без обрезки
-      imageBytes = _lastPngBytes!;
+      // Если углов нет или их количество не равно 4, выполняем преобразование (цвет, поворот, кодирование в PNG)
+      Uint8List pngBytes = _lastPngBytes!;
+
+      // Если _paperCorners равен null, можно создать пустой список или игнорировать его
+      List<dynamic> cornersDynamic = _paperCorners != null
+          ? _paperCorners!.map((pt) => [pt.dx, pt.dy]).toList()
+          : [];
+
+      // Декодируем исходное изображение в cv.Mat в цветном режиме
+      cv.Mat mat = cv.imdecode(pngBytes, cv.IMREAD_COLOR);
+
+      // Преобразуем цвет из BGR (по умолчанию OpenCV) в RGB
+      cv.Mat rgbMat = cv.cvtColor(mat, cv.COLOR_BGR2RGB);
+      debugPrint("Изображение после cvtColor: channels = ${rgbMat.channels}");
+
+      // Если устройство не iOS, поворачиваем изображение на 90° по часовой стрелке
+      cv.Mat finalMat;
+      if (!Platform.isIOS) {
+        finalMat = cv.rotate(rgbMat, cv.ROTATE_90_CLOCKWISE);
+        debugPrint("Изображение повернуто: ширина = ${finalMat.width}, высота = ${finalMat.height}");
+        rgbMat.dispose();
+      } else {
+        finalMat = rgbMat;
+      }
+
+      // Кодируем итоговое изображение в PNG
+      final result = cv.imencode(".png", finalMat);
+      if (!result.$1) {
+        throw Exception("Ошибка при кодировании изображения в PNG");
+      }
+      Uint8List pngBytesf = result.$2;
+      debugPrint("Размер итогового изображения (PNG): ${pngBytesf.lengthInBytes} байт");
+
+      finalMat.dispose();
+      imageBytes = pngBytesf;
     }
 
     // Если полученные байты не пустые, сохраняем файл
@@ -374,6 +447,85 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
             : LoadingScreen(),
       ),
     );
+  }
+}
+
+/// Функция, которую можно запускать через compute().
+Uint8List convertYUV420ToPNGFromMap(Map<String, dynamic> params) {
+  final int width = params['width'];
+  final int height = params['height'];
+  final int planesCount = params['planesCount'];
+
+  if (planesCount == 1) {
+    final List<int> planeBytes = List<int>.from(params['plane0']['bytes']);
+    // Здесь ожидается ByteBuffer, поэтому:
+    final img.Image bgraImage = img.Image.fromBytes(
+      width: width,
+      height: height,
+      bytes: Uint8List.fromList(planeBytes).buffer,
+      order: img.ChannelOrder.bgra,
+    );
+    return Uint8List.fromList(img.encodePng(bgraImage));
+  } else if (planesCount == 2) {
+    final List<int> planeY = List<int>.from(params['plane0']['bytes']);
+    final int rowStrideY = params['plane0']['rowStride'];
+    final List<int> planeUV = List<int>.from(params['plane1']['bytes']);
+    final int uvRowStride = params['plane1']['rowStride'];
+    final int uvPixelStride = params['plane1']['pixelStride'] ?? 2;
+
+    final img.Image rgbImage = img.Image(width: width, height: height);
+
+    for (int y = 0; y < height; y++) {
+      for (int x = 0; x < width; x++) {
+        int yp = planeY[y * rowStrideY + x];
+        int uvIndex = (y ~/ 2) * uvRowStride + (x ~/ 2) * 2;
+        int u, v;
+        if (Platform.isIOS) {
+          v = planeUV[uvIndex];
+          u = planeUV[uvIndex + 1];
+        } else {
+          u = planeUV[uvIndex];
+          v = planeUV[uvIndex + 1];
+        }
+        double yVal = yp.toDouble();
+        double uVal = u.toDouble() - 128.0;
+        double vVal = v.toDouble() - 128.0;
+        int r = (yVal + 1.402 * vVal).round().clamp(0, 255);
+        int g = (yVal - 0.344136 * uVal - 0.714136 * vVal).round().clamp(0, 255);
+        int b = (yVal + 1.772 * uVal).round().clamp(0, 255);
+        rgbImage.setPixelRgba(x, y, r, g, b, 255);
+      }
+    }
+    return Uint8List.fromList(img.encodePng(rgbImage));
+  } else if (planesCount >= 3) {
+    final List<int> planeY = List<int>.from(params['plane0']['bytes']);
+    final int rowStrideY = params['plane0']['rowStride'];
+    final List<int> planeU = List<int>.from(params['plane1']['bytes']);
+    final int rowStrideU = params['plane1']['rowStride'];
+    final List<int> planeV = List<int>.from(params['plane2']['bytes']);
+    final int rowStrideV = params['plane2']['rowStride'];
+    final int uvPixelStride = params['plane1']['pixelStride'] ?? 1;
+
+    final img.Image rgbImage = img.Image(width: width, height: height);
+
+    for (int y = 0; y < height; y++) {
+      for (int x = 0; x < width; x++) {
+        int yp = planeY[y * rowStrideY + x];
+        int uvIndex = (y ~/ 2) * rowStrideU + (x ~/ 2) * uvPixelStride;
+        int up = planeV[uvIndex];
+        int vp = planeU[uvIndex];
+        double yVal = yp.toDouble();
+        double uVal = up.toDouble() - 128.0;
+        double vVal = vp.toDouble() - 128.0;
+        int r = (yVal + 1.402 * vVal).round().clamp(0, 255);
+        int g = (yVal - 0.344136 * uVal - 0.714136 * vVal).round().clamp(0, 255);
+        int b = (yVal + 1.772 * uVal).round().clamp(0, 255);
+        rgbImage.setPixelRgba(x, y, r, g, b, 255);
+      }
+    }
+    return Uint8List.fromList(img.encodePng(rgbImage));
+  } else {
+    throw Exception("Неподдерживаемый формат камеры: ожидается 1 (BGRA), 2 (NV12) или 3 (YUV420) плоскости.");
   }
 }
 
@@ -511,32 +663,27 @@ Future<Uint8List> cropFrameInIsolate(Map<String, dynamic> params) async {
   try {
     // Исходные данные
     Uint8List pngBytes = params['pngBytes'];
-    List<dynamic> cornersDynamic = params['corners'];
+    List<dynamic> cornersDynamic = params[
+    'corners']; // Ожидается список вида [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
+
     // Декодируем исходное изображение в cv.Mat в цветном режиме
     cv.Mat mat = cv.imdecode(pngBytes, cv.IMREAD_COLOR);
     debugPrint(
         "Исходное изображение: ширина = ${mat.width}, высота = ${mat.height}, channels = ${mat.channels}");
 
-    // Если передано ровно 4 точки, используем их, иначе создаём список, охватывающий всё изображение.
-    List<cv.Point2f> srcPoints;
-    if (cornersDynamic.length == 4) {
-      srcPoints = cornersDynamic
-          .map<cv.Point2f>(
-              (item) => cv.Point2f(item[0].toDouble(), item[1].toDouble()))
-          .toList();
-    } else {
-      debugPrint("Количество точек не равно 4, используем углы всего изображения.");
-      srcPoints = [
-        cv.Point2f(0, 0),
-        cv.Point2f(mat.width.toDouble(), 0),
-        cv.Point2f(mat.width.toDouble(), mat.height.toDouble()),
-        cv.Point2f(0, mat.height.toDouble()),
-      ];
+    // Преобразуем список углов в список Point2f
+    List<cv.Point2f> srcPoints = cornersDynamic
+        .map<cv.Point2f>(
+            (item) => cv.Point2f(item[0].toDouble(), item[1].toDouble()))
+        .toList();
+    if (srcPoints.length != 4) {
+      throw Exception('Ожидается ровно 4 точки для обрезки');
     }
 
     // Упорядочиваем точки в порядке: верхний левый, верхний правый, нижний правый, нижний левый
     List<cv.Point2f> orderedPoints = orderPoints(srcPoints);
-    debugPrint("Упорядоченные точки: ${orderedPoints.map((pt) => "(${pt.x}, ${pt.y})").join(', ')}");
+    debugPrint(
+        "Упорядоченные точки: ${orderedPoints.map((pt) => "(${pt.x}, ${pt.y})").join(', ')}");
 
     // Вычисляем ширину итогового изображения как максимум из расстояний между верхними и нижними сторонами:
     double widthTop = math.sqrt(
@@ -556,7 +703,8 @@ Future<Uint8List> cropFrameInIsolate(Map<String, dynamic> params) async {
             math.pow(orderedPoints[2].y - orderedPoints[1].y, 2));
     double maxHeight = math.max(heightLeft, heightRight);
 
-    debugPrint("Вычисленные размеры итогового изображения: maxWidth = $maxWidth, maxHeight = $maxHeight");
+    debugPrint(
+        "Вычисленные размеры итогового изображения: maxWidth = $maxWidth, maxHeight = $maxHeight");
 
     // Определяем целевые точки для перспективного преобразования
     List<cv.Point2f> dstPoints = [
@@ -578,24 +726,20 @@ Future<Uint8List> cropFrameInIsolate(Map<String, dynamic> params) async {
       perspectiveMatrix,
       (maxWidth.toInt(), maxHeight.toInt()),
     );
-    debugPrint("Изображение после warpPerspective: ширина = ${warped.width}, высота = ${warped.height}, channels = ${warped.channels}");
-
-    // Освобождаем ненужные ресурсы
-    perspectiveMatrix.dispose();
-    srcVec.dispose();
-    dstVec.dispose();
-    mat.dispose(); // исходный mat больше не нужен
+    debugPrint(
+        "Изображение после warpPerspective: ширина = ${warped.width}, высота = ${warped.height}, channels = ${warped.channels}");
 
     // Преобразуем цветовое пространство из BGR (стандарт OpenCV) в RGB
     cv.Mat rgbMat = cv.cvtColor(warped, cv.COLOR_BGR2RGB);
     debugPrint("Изображение после cvtColor: channels = ${rgbMat.channels}");
 
     // Если не iOS, поворачиваем изображение вправо (на 90° по часовой стрелке);
-    // для iOS оставляем исходное изображение.
+    // для iOS сохраняем исходное изображение.
     cv.Mat finalMat;
     if (!Platform.isIOS) {
       finalMat = cv.rotate(rgbMat, cv.ROTATE_90_CLOCKWISE);
-      debugPrint("Изображение повернуто: ширина = ${finalMat.width}, высота = ${finalMat.height}");
+      debugPrint(
+          "Изображение повернуто: ширина = ${finalMat.width}, высота = ${finalMat.height}");
       rgbMat.dispose();
     } else {
       finalMat = rgbMat;
@@ -607,15 +751,20 @@ Future<Uint8List> cropFrameInIsolate(Map<String, dynamic> params) async {
       throw Exception("Ошибка при кодировании изображения в PNG");
     }
     Uint8List croppedPng = result.$2;
-    debugPrint("Размер итогового изображения (PNG): ${croppedPng.lengthInBytes} байт");
+    debugPrint(
+        "Размер обрезанного изображения (PNG): ${croppedPng.lengthInBytes} байт");
 
     // Освобождаем ресурсы
+    mat.dispose();
+    perspectiveMatrix.dispose();
     warped.dispose();
     finalMat.dispose();
+    srcVec.dispose();
+    dstVec.dispose();
 
     return croppedPng;
   } catch (e) {
-    debugPrint("Ошибка при обработке изображения: $e");
+    debugPrint("Ошибка при обрезке: $e");
     return Uint8List(0);
   }
 }

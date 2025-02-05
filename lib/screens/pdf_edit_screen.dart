@@ -18,8 +18,9 @@ import '../widgets/toggle_menu.dart';
 
 class PdfEditScreen extends StatefulWidget {
   final ScanFile file;
+  final int? index;
 
-  const PdfEditScreen({super.key, required this.file});
+  const PdfEditScreen({super.key, required this.file, this.index});
 
   @override
   State<PdfEditScreen> createState() => _PdfEditScreenState();
@@ -68,7 +69,7 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
     super.initState();
   }
 
-  Future<bool> _showSubscriptionDialogOrShare() async {
+  Future<bool> _showSubscriptionDialog() async {
     // Проверяем наличие активной подписки через RevenueCat
     bool hasSubscription = await RevenueCatService().isUserSubscribed();
 
@@ -120,8 +121,8 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
 
     if (_oldIndex == 2 && newIndex == 2) {
       await _penKey.currentState?.saveAnnotatedImage();
-      final state = await _showSubscriptionDialogOrShare();
-      if (state == true) {
+      final state = await _showSubscriptionDialog();
+      if (state) {
         _sharePdfFile();
       }
     }
@@ -183,7 +184,7 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
                     ),
                     CustomCircularButton(
                       onTap: () async {
-                        final state = await _showSubscriptionDialogOrShare();
+                        final state = await _showSubscriptionDialog();
                         if (state == true) {
                           _sharePdfFile();
                         }

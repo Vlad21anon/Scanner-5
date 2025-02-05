@@ -58,7 +58,7 @@ class ScanningFilesScreen extends StatelessWidget {
                     // При нажатии переходим на экран редактирования PDF для всего файла
                     navigation.navigateTo(
                       context,
-                      PdfEditScreen(file: file),
+                      PdfEditScreen(file: file, index: index),
                     );
                   },
                   child: FileCard(
@@ -71,15 +71,12 @@ class ScanningFilesScreen extends StatelessWidget {
                         PdfEditScreen(file: file),
                       );
                     },
-                    onLongPress: () {
-                      // Здесь можно реализовать логику для долгого нажатия (например, удаление или редактирование страницы)
-                    },
-                    isSelectedMode: false,
                   ),
                 );
               },
             ),
           ),
+          SizedBox(height: 16.h),
         ],
       ),
     );
