@@ -36,6 +36,35 @@ class TextEditWidgetState extends State<TextEditWidget> {
     });
   }
 
+  double getInitialChildSize(BuildContext context, bool addPenMode) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    // Если высота экрана больше (например, iPhone 14), используем "больше" значения
+    if (screenHeight >= 800) {
+      return addPenMode ? 0.8 : 0.45;
+    } else {
+      // Для маленьких экранов (например, iPhone 7) немного уменьшаем размеры
+      return addPenMode ? 0.82 : 0.50;
+    }
+  }
+
+  double getMinChildSize(BuildContext context, bool addPenMode) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    if (screenHeight >= 800) {
+      return addPenMode ? 0.8 : 0.1;
+    } else {
+      return addPenMode ? 0.82 : 0.1;
+    }
+  }
+
+  double getMaxChildSize(BuildContext context, bool addPenMode) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    if (screenHeight >= 800) {
+      return addPenMode ? 0.8 : 0.45;
+    } else {
+      return addPenMode ? 0.82 : 0.50;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -69,9 +98,9 @@ class TextEditWidgetState extends State<TextEditWidget> {
               ),
             ),
             DraggableScrollableSheet(
-              initialChildSize: isEditMode ? 0.8.h : 0.45.h,
-              minChildSize: isEditMode ? 0.8.h : 0.1.h,
-              maxChildSize: isEditMode ? 0.8.h : 0.45.h,
+              initialChildSize: getInitialChildSize(context, isEditMode),
+              minChildSize: getMinChildSize(context, isEditMode),
+              maxChildSize: getMaxChildSize(context, isEditMode),
               builder: (context, scrollController) {
                 return Container(
                   decoration: BoxDecoration(

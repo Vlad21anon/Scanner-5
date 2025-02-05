@@ -25,7 +25,7 @@ class SettingsScreen extends StatelessWidget {
               child: Assets.images.unlock.image(
                 height: 143.h,
                 width: 361.w,
-                fit: BoxFit.cover,
+                fit: BoxFit.contain,
               ),
             ),
             SizedBox(height: 16.h),

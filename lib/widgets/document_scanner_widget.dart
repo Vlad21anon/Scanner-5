@@ -36,7 +36,7 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
 
   // Дополнительные параметры для корректировки смещения
   double offsetAdjustmentX = 0;
-  double offsetAdjustmentY = -120.h; // можно настроить под ваш дизайн
+  double offsetAdjustmentY = -55; // можно настроить под ваш дизайн
 
   int _frameCounter = 0; // Счётчик кадров для обработки каждого N-ого кадра
   final int _processEveryNthFrame = 2; // например, обрабатывать каждый второй кадр

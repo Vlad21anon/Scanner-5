@@ -28,8 +28,8 @@ class FilePopup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-        width: 158.w,
-        height: 136.h,
+        width: 158,
+        height: 136,
         padding: EdgeInsets.all(16.r),
         decoration: BoxDecoration(
           color: Colors.white,
