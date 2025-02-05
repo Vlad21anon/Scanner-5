@@ -4,7 +4,7 @@ import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../models/scan_file.dart';
+import '../models/scan_file.dart';
 
 class ScanFilesCubit extends Cubit<List<ScanFile>> {
   ScanFilesCubit() : super([]);
