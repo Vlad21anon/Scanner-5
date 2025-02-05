@@ -56,7 +56,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           SizedBox(
             width: double.infinity,
             child: Assets.images.onboardingBack.image(
-              fit: BoxFit.cover,
+              fit: BoxFit.fill,
             ),
           ),
           // Основное содержимое: PageView с экранами онбординга

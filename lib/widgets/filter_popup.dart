@@ -23,8 +23,8 @@ class _FilterPopupState extends State<FilterPopup> {
   @override
   Widget build(BuildContext context) {
     return Container(
-        width: 260.w,
-        height: 325.h,
+        width: 260,
+        height: 315,
         padding: EdgeInsets.all(16.r),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -33,54 +33,56 @@ class _FilterPopupState extends State<FilterPopup> {
             AppShadows.grey03b3r1o00,
           ],
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(
-                  "Filter",
-                  style: AppTextStyle.exo20.copyWith(fontSize: 24.sp),
-                ),
-                const Spacer(),
-                AppIcons.filterBlack24x12,
-              ],
-            ),
-            SizedBox(height: 16.h),
-            Text("Name", style: AppTextStyle.exo20),
-            SizedBox(height: 12.h),
-            CustomRadioList(
-              title: "A to Z",
-              value: "A to Z",
-              groupValue: context.watch<FilterCubit>().state.nameFilter,
-              onChanged: (value) => context.read<FilterCubit>().updateNameFilter(value!),
-            ),
-            SizedBox(height: 8.h),
-            CustomRadioList(
-              title: "Z to A",
-              value: "Z to A",
-              groupValue: context.watch<FilterCubit>().state.nameFilter,
-              onChanged: (value) => context.read<FilterCubit>().updateNameFilter(value!),
-            ),
-            SizedBox(height: 16.h),
-            Text("Date", style: AppTextStyle.exo20),
-            SizedBox(height: 12.h),
-            CustomRadioList(
-              title: "New files",
-              value: "New files",
-              groupValue: context.watch<FilterCubit>().state.dateFilter,
-              onChanged: (value) => context.read<FilterCubit>().updateDateFilter(value!),
-            ),
-            SizedBox(height: 8.h),
-            CustomRadioList(
-              title: "Old files",
-              value: "Old files",
-              groupValue: context.watch<FilterCubit>().state.dateFilter,
-              onChanged: (value) => context.read<FilterCubit>().updateDateFilter(value!),
-            ),
-          ],
-        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    "Filter",
+                    style: AppTextStyle.exo20.copyWith(fontSize: 24.sp),
+                  ),
+                  const Spacer(),
+                  AppIcons.filterBlack24x12,
+                ],
+              ),
+              SizedBox(height: 16.h),
+              Text("Name", style: AppTextStyle.exo20),
+              SizedBox(height: 12.h),
+              CustomRadioList(
+                title: "A to Z",
+                value: "A to Z",
+                groupValue: context.watch<FilterCubit>().state.nameFilter,
+                onChanged: (value) => context.read<FilterCubit>().updateNameFilter(value!),
+              ),
+              SizedBox(height: 8.h),
+              CustomRadioList(
+                title: "Z to A",
+                value: "Z to A",
+                groupValue: context.watch<FilterCubit>().state.nameFilter,
+                onChanged: (value) => context.read<FilterCubit>().updateNameFilter(value!),
+              ),
+              SizedBox(height: 16.h),
+              Text("Date", style: AppTextStyle.exo20),
+              SizedBox(height: 12.h),
+              CustomRadioList(
+                title: "New files",
+                value: "New files",
+                groupValue: context.watch<FilterCubit>().state.dateFilter,
+                onChanged: (value) => context.read<FilterCubit>().updateDateFilter(value!),
+              ),
+              SizedBox(height: 8.h),
+              CustomRadioList(
+                title: "Old files",
+                value: "Old files",
+                groupValue: context.watch<FilterCubit>().state.dateFilter,
+                onChanged: (value) => context.read<FilterCubit>().updateDateFilter(value!),
+              ),
+            ],
+          ),
+        )
     );
   }
 }

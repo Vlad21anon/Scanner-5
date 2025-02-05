@@ -6,7 +6,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
 import 'package:owl_tech_pdf_scaner/app/app_icons.dart';
 import 'package:owl_tech_pdf_scaner/app/app_text_style.dart';
-import 'package:owl_tech_pdf_scaner/gen/assets.gen.dart';
 import 'package:owl_tech_pdf_scaner/models/draw_point.dart';
 import 'package:owl_tech_pdf_scaner/models/note_data.dart';
 import 'package:owl_tech_pdf_scaner/models/scan_file.dart';
@@ -14,6 +13,8 @@ import 'package:owl_tech_pdf_scaner/widgets/custom_circular_button.dart';
 import 'package:owl_tech_pdf_scaner/widgets/handwriting_painter.dart';
 import 'package:owl_tech_pdf_scaner/widgets/%D1%81ustom_slider.dart';
 import 'package:owl_tech_pdf_scaner/widgets/resizable_note.dart';
+
+import '../services/screen_service.dart';
 
 class PenEditWidget extends StatefulWidget {
   final ScanFile file;
@@ -41,6 +42,40 @@ class PenEditWidgetState extends State<PenEditWidget> {
     setState(() {
       imageKey = key;
     });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  double getInitialChildSize(BuildContext context, bool addPenMode) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    // Если высота экрана больше (например, iPhone 14), используем "больше" значения
+    if (screenHeight >= 800) {
+      return addPenMode ? 0.85 : 0.6;
+    } else {
+      // Для маленьких экранов (например, iPhone 7) немного уменьшаем размеры
+      return addPenMode ? 0.95 : 0.55;
+    }
+  }
+
+  double getMinChildSize(BuildContext context, bool addPenMode) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    if (screenHeight >= 800) {
+      return addPenMode ? 0.85 : 0.1;
+    } else {
+      return addPenMode ? 0.95 : 0.1;
+    }
+  }
+
+  double getMaxChildSize(BuildContext context, bool addPenMode) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    if (screenHeight >= 800) {
+      return addPenMode ? 0.85 : 0.6;
+    } else {
+      return addPenMode ? 0.95 : 0.55;
+    }
   }
 
   @override
@@ -97,9 +132,9 @@ class PenEditWidgetState extends State<PenEditWidget> {
                 );
               }),
               DraggableScrollableSheet(
-                initialChildSize: addPenMode ? 0.83.h : 0.5.h,
-                minChildSize: addPenMode ? 0.83.h : 0.1.h,
-                maxChildSize: addPenMode ? 0.83.h : 0.5.h,
+                initialChildSize: getInitialChildSize(context, addPenMode),
+                minChildSize: getMinChildSize(context, addPenMode),
+                maxChildSize: getMaxChildSize(context, addPenMode),
                 builder: (context, scrollController) {
                   return Container(
                     decoration: BoxDecoration(
