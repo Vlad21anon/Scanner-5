@@ -1,19 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 
-// для вызова покупки подписки
-// ElevatedButton(
-// onPressed: () async {
-// await RevenueCatService().purchaseSubscription("your_package_identifier");
-// // После покупки повторно проверяем статус подписки
-// bool subscribed = await RevenueCatService().isUserSubscribed();
-// if (subscribed) {
-// print("Подписка оформлена, обновляем UI");
-// }
-// },
-// child: Text("Оформить подписку"),
-// ),
-
 class RevenueCatService {
   // Синглтон для доступа из разных частей приложения
   static final RevenueCatService _instance = RevenueCatService._internal();
@@ -27,13 +14,14 @@ class RevenueCatService {
       await Purchases.setLogLevel(LogLevel.debug);
 
       // Создаём конфигурацию с вашим API-ключом RevenueCat
-      final configuration = PurchasesConfiguration("REVENUECAT_API_KEY");
+      final configuration = PurchasesConfiguration("appl_TNOAwCXToTkIawQNcxCTHjiamBt");
       // Дополнительно можно указать параметры, например:
       // configuration.appUserID = "optional_user_id";
       // configuration.observerMode = false;
 
       // Инициализируем SDK с новой конфигурацией
       await Purchases.configure(configuration);
+      debugPrint("RevenueCat успешно инициализирован");
     } catch (e) {
       debugPrint("Ошибка инициализации RevenueCat: $e");
     }
@@ -44,7 +32,9 @@ class RevenueCatService {
     try {
       final customerInfo = await Purchases.getCustomerInfo();
       // Если у пользователя есть хотя бы один активный entitlement – подписка оформлена
-      return customerInfo.entitlements.active.isNotEmpty;
+      bool isSubscribed = customerInfo.entitlements.active.isNotEmpty;
+      debugPrint("Статус подписки: ${isSubscribed ? 'активна' : 'неактивна'}");
+      return isSubscribed;
     } catch (e) {
       debugPrint("Ошибка проверки подписки: $e");
       return false;
@@ -66,12 +56,28 @@ class RevenueCatService {
         final customerInfo = await Purchases.purchasePackage(package);
         if (customerInfo.entitlements.active.isNotEmpty) {
           debugPrint("Подписка оформлена успешно");
+        } else {
+          debugPrint("Подписка не активна после покупки");
         }
       } else {
         debugPrint("Нет доступных пакетов подписки");
       }
     } catch (e) {
       debugPrint("Ошибка покупки подписки: $e");
+    }
+  }
+
+  /// Восстановление покупок
+  Future<void> restorePurchases() async {
+    try {
+      final customerInfo = await Purchases.restorePurchases();
+      if (customerInfo.entitlements.active.isNotEmpty) {
+        debugPrint("Подписка восстановлена");
+      } else {
+        debugPrint("Подписка не восстановлена");
+      }
+    } catch (e) {
+      debugPrint("Ошибка восстановления подписки: $e");
     }
   }
 }

@@ -9,6 +9,7 @@ import '../app/app_text_style.dart';
 import '../blocs/files_cubit.dart';
 import '../services/file_share_service.dart';
 import '../services/navigation_service.dart';
+import '../services/revenuecat_service.dart';
 import '../widgets/crop_widget.dart';
 import '../widgets/custom_circular_button.dart';
 import '../widgets/pen_edit_widget.dart';
@@ -68,11 +69,14 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
   }
 
   Future<bool> _showSubscriptionDialogOrShare() async {
-    // Если у пользователя уже есть подписка – разрешаем использовать режим Pen
-    if (_hasSubscription) {
+    // Проверяем наличие активной подписки через RevenueCat
+    bool hasSubscription = await RevenueCatService().isUserSubscribed();
+
+    if (hasSubscription) {
+      // Если подписка активна, разрешаем использовать режим Pen
       return true;
     } else {
-      // Если подписки нет, показываем диалог для выбора: подписаться или поделиться
+      // Если подписки нет, переходим на экран подписки
       navigation.navigateTo(context, SubscriptionSelectionScreen());
       return false;
     }
@@ -115,6 +119,7 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
     }
 
     if (_oldIndex == 2 && newIndex == 2) {
+      await _penKey.currentState?.saveAnnotatedImage();
       final state = await _showSubscriptionDialogOrShare();
       if (state == true) {
         _sharePdfFile();

@@ -11,6 +11,7 @@ import '../gen/assets.gen.dart';
 import 'dart:math' as math;
 
 import '../services/navigation_service.dart';
+import '../services/revenuecat_service.dart'; // Импортируем сервис RevenueCat
 
 enum SelectedSubType { year, week }
 
@@ -27,10 +28,52 @@ class _SubscriptionSelectionScreenState
   SelectedSubType selectedSub = SelectedSubType.year;
   final navigator = NavigationService();
 
+  /// Метод для открытия URL
   Future<void> _openUrl(String url) async {
     final uri = Uri.parse(url);
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       throw Exception('Не удалось открыть $url');
+    }
+  }
+
+  /// Метод для совершения покупки подписки с выбранным пакетом
+  Future<void> _purchaseSubscription() async {
+    // Здесь необходимо указать правильный идентификатор пакета, как настроено в RevenueCat.
+    // Например, для годовой подписки используем "year_package", а для недельной "week_package".
+    String packageIdentifier = selectedSub == SelectedSubType.year
+        ? "year_package"  // Замените на реальный идентификатор пакета для годовой подписки
+        : "week_package"; // Замените на реальный идентификатор пакета для недельной подписки
+
+    await RevenueCatService().purchaseSubscription(packageIdentifier);
+
+    // После покупки проверяем активна ли подписка
+    bool subscribed = await RevenueCatService().isUserSubscribed();
+    if (subscribed) {
+      debugPrint("Подписка оформлена, обновляем UI");
+      // Здесь можно выполнить дополнительные действия (например, обновить состояние приложения)
+      // Например, перейти на основной экран приложения:
+      navigator.navigateTo(context, MainScreen(), replace: true);
+    } else {
+      debugPrint("Подписка не оформлена");
+      // Можно показать сообщение пользователю
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Подписка не оформлена, попробуйте еще раз.")),
+      );
+    }
+  }
+
+  /// Метод для восстановления покупок
+  Future<void> _restorePurchases() async {
+    await RevenueCatService().restorePurchases(); // Если данный метод добавлен в сервис
+    bool subscribed = await RevenueCatService().isUserSubscribed();
+    if (subscribed) {
+      debugPrint("Подписка восстановлена, обновляем UI");
+      navigator.navigateTo(context, MainScreen(), replace: true);
+    } else {
+      debugPrint("Подписка не восстановлена");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Не удалось восстановить подписку.")),
+      );
     }
   }
 
@@ -108,7 +151,9 @@ class _SubscriptionSelectionScreenState
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 TextButton(
-                  onPressed: () {},
+                  onPressed: () async {
+                    await _restorePurchases();
+                  },
                   child: Text(
                     'Restore',
                     style: AppTextStyle.exo16.copyWith(
@@ -171,7 +216,9 @@ class _SubscriptionSelectionScreenState
             left: 0,
             right: 0,
             child: GestureDetector(
-              onTap: () {},
+              onTap: () async {
+                await _purchaseSubscription();
+              },
               child: Container(
                 margin: EdgeInsets.symmetric(horizontal: 16.w),
                 padding: EdgeInsets.all(6.w),
@@ -255,7 +302,7 @@ class _SubscriptionSelectionScreenState
                     ),
                   ],
                 ),
-                SizedBox(height: 12),
+                SizedBox(height: 12.h),
                 Row(
                   children: [
                     Text(

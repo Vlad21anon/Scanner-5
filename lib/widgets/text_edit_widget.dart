@@ -11,6 +11,7 @@ import '../models/scan_file.dart';
 
 class TextEditWidget extends StatefulWidget {
   final ScanFile file;
+
   const TextEditWidget({super.key, required this.file});
 
   @override
@@ -78,7 +79,7 @@ class TextEditWidgetState extends State<TextEditWidget> {
   /// Используется текущий путь из widget.file.pages[_currentPageIndex]
   Future<void> saveTextInImage() async {
     final pagePath = widget.file.pages[_currentPageIndex];
-    if (pagePath.isEmpty || _text.isEmpty || _text == 'Tap to edit') return;
+    if (pagePath.isEmpty || _text.isEmpty || _text == '') return;
     final file = File(pagePath);
     if (!await file.exists()) return;
     try {
@@ -109,8 +110,10 @@ class TextEditWidgetState extends State<TextEditWidget> {
       textPainter.layout(maxWidth: displayedWidth * scaleX);
       textPainter.paint(canvas, Offset(drawX, drawY));
       final ui.Picture picture = recorder.endRecording();
-      final ui.Image finalImage = await picture.toImage(originalWidth, originalHeight);
-      final ByteData? finalByteData = await finalImage.toByteData(format: ui.ImageByteFormat.png);
+      final ui.Image finalImage =
+          await picture.toImage(originalWidth, originalHeight);
+      final ByteData? finalByteData =
+          await finalImage.toByteData(format: ui.ImageByteFormat.png);
       if (finalByteData == null) return;
       final Uint8List finalBytes = finalByteData.buffer.asUint8List();
       await file.writeAsBytes(finalBytes);
@@ -180,16 +183,39 @@ class TextEditWidgetState extends State<TextEditWidget> {
           children: [
             // Если многостраничный режим – используем PageView
             multiPage
-                ? PageView.builder(
-              controller: _pageController,
-              scrollDirection: Axis.vertical,
-              itemCount: widget.file.pages.length,
-              onPageChanged: _onPageChanged,
-              itemBuilder: (context, index) {
-                return _buildTextAnnotationUI(widget.file.pages[index]);
-              },
+                ? Stack(
+              children: [
+                // Основной виджет PageView
+                PageView.builder(
+                  controller: _pageController,
+                  scrollDirection: Axis.vertical,
+                  itemCount: widget.file.pages.length,
+                  onPageChanged: _onPageChanged,
+                  itemBuilder: (context, index) {
+                    return _buildTextAnnotationUI(widget.file.pages[index]);
+                  },
+                ),
+                // Отображение номера текущей страницы внизу
+                Positioned(
+                  bottom: 90.h, // отступ от нижнего края (можно регулировать)
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12.r),
+                      ),
+                      child: Text(
+                        "${_currentPageIndex + 1} / ${widget.file.pages.length}",
+                        style: AppTextStyle.exo20,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             )
-            // Если одностраничный – отображаем обычное изображение
                 : _buildTextAnnotationUI(widget.file.pages.first),
             // Панель с настройками (DraggableScrollableSheet)
             DraggableScrollableSheet(
@@ -200,45 +226,54 @@ class TextEditWidgetState extends State<TextEditWidget> {
                 return Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(30.r)),
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(30.r)),
                   ),
                   child: ListView(
                     controller: scrollController,
-                    padding: EdgeInsets.all(16.r),
+                    padding: EdgeInsets.only(top: 12.h),
                     children: [
-                      Center(
-                        child: Container(
-                          width: 110.w,
-                          height: 4.h,
-                          decoration: BoxDecoration(
-                            color: AppColors.black,
-                            borderRadius: BorderRadius.circular(8.r),
-                          ),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16.w),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Center(
+                              child: Container(
+                                width: 110.w,
+                                height: 4.h,
+                                decoration: BoxDecoration(
+                                  color: AppColors.black,
+                                  borderRadius: BorderRadius.circular(8.r),
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: 8.h),
+                            Text('Font Size', style: AppTextStyle.exo20),
+                            SizedBox(height: 16.h),
+                            Row(
+                              children: [
+                                Text('Small', style: AppTextStyle.exo16),
+                                Expanded(
+                                  child: GradientSlider(
+                                    isActive: true,
+                                    onChanged: (val) {
+                                      setState(() {
+                                        _fontSize = val;
+                                      });
+                                    },
+                                    value: _fontSize,
+                                  ),
+                                ),
+                                Text('Large', style: AppTextStyle.exo16),
+                              ],
+                            ),
+                            SizedBox(height: 24.h),
+                            Text('Color', style: AppTextStyle.exo20),
+                            SizedBox(height: 16.h),
+                          ],
                         ),
                       ),
-                      SizedBox(height: 8.h),
-                      Text('Font Size', style: AppTextStyle.exo20),
-                      SizedBox(height: 16.h),
-                      Row(
-                        children: [
-                          Text('Small', style: AppTextStyle.exo16),
-                          Expanded(
-                            child: GradientSlider(
-                              isActive: isEditMode,
-                              onChanged: (val) {
-                                setState(() {
-                                  _fontSize = val;
-                                });
-                              },
-                              value: _fontSize,
-                            ),
-                          ),
-                          Text('Large', style: AppTextStyle.exo16),
-                        ],
-                      ),
-                      SizedBox(height: 24.h),
-                      Text('Color', style: AppTextStyle.exo20),
-                      SizedBox(height: 16.h),
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
@@ -266,6 +301,7 @@ class TextEditWidgetState extends State<TextEditWidget> {
             // Виджет редактируемого текста, поверх изображения
             Positioned.fill(
               child: EditableMovableResizableText(
+                key: ValueKey(_currentPageIndex),
                 initialPosition: _textOffset,
                 initialText: _text,
                 textColor: _textColor,
@@ -311,7 +347,9 @@ class TextEditWidgetState extends State<TextEditWidget> {
           shape: BoxShape.circle,
           border: isSelected
               ? Border.all(color: AppColors.black, width: 3.w)
-              : (showBorder ? Border.all(color: AppColors.greyIcon, width: 2.w) : null),
+              : (showBorder
+                  ? Border.all(color: AppColors.greyIcon, width: 2.w)
+                  : null),
         ),
       ),
     );
@@ -324,7 +362,7 @@ class TextEditWidgetState extends State<TextEditWidget> {
     final String path = widget.file.pages.length > 1
         ? widget.file.pages[_currentPageIndex]
         : widget.file.pages.first;
-    if (path.isEmpty || _text.isEmpty || _text == 'Tap to edit') return;
+    if (path.isEmpty || _text.isEmpty || _text == '') return;
     final file = File(path);
     if (!await file.exists()) return;
     try {
@@ -354,8 +392,10 @@ class TextEditWidgetState extends State<TextEditWidget> {
       textPainter.layout(maxWidth: displayedWidth * scaleX);
       textPainter.paint(canvas, Offset(drawX, drawY));
       final ui.Picture picture = recorder.endRecording();
-      final ui.Image finalImage = await picture.toImage(originalWidth, originalHeight);
-      final ByteData? finalByteData = await finalImage.toByteData(format: ui.ImageByteFormat.png);
+      final ui.Image finalImage =
+          await picture.toImage(originalWidth, originalHeight);
+      final ByteData? finalByteData =
+          await finalImage.toByteData(format: ui.ImageByteFormat.png);
       if (finalByteData == null) return;
       final Uint8List finalBytes = finalByteData.buffer.asUint8List();
       await file.writeAsBytes(finalBytes);
