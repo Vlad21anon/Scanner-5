@@ -176,7 +176,7 @@ class EditableMovableResizableTextState
                         Positioned.fill(
                           child: Container(
                             //padding: EdgeInsets.all(6.r),
-                            alignment: Alignment.center,
+                            alignment: Alignment.topLeft,
                             child: _isEditing
                                 ? TextField(
                                     controller: _controller,

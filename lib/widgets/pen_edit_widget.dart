@@ -60,8 +60,6 @@ class PenEditWidgetState extends State<PenEditWidget> {
 
   // Локальный список для хранения подписей (аннотаций), добавленных на экран (отображаемых поверх изображения)
   List<NoteData> _placedSignatures = [];
-  double? _displayedWidth;
-  double? _displayedHeight;
 
   // Объявляем размеры исходного изображения.
   int _imageWidth = 0;
@@ -144,8 +142,6 @@ class PenEditWidgetState extends State<PenEditWidget> {
     final double drawingWidth = 361.w;
     final double drawingHeight = 203.h;
     // Размеры контейнера для изображения
-    final double containerWidth = 361.w;
-    final double containerHeight = 491.h;
 
     final double screenHeight = MediaQuery.of(context).size.height;
     // Для упрощения считаем, что высота выбранного и невыбранного элементов одинакова (50% экрана)
@@ -530,7 +526,7 @@ class PenEditWidgetState extends State<PenEditWidget> {
       borderRadius: BorderRadius.circular(12.r),
       child: Image.file(
         File(imagePath),
-        key: UniqueKey(), // для принудительного обновления
+        key: imageKey, // для принудительного обновления
         fit: BoxFit.contain,
         color: withShadow ? Colors.black.withAlpha(128) : null,
         colorBlendMode: withShadow ? BlendMode.darken : null,

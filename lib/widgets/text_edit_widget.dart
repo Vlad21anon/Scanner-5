@@ -7,11 +7,14 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
 import 'package:owl_tech_pdf_scaner/app/app_text_style.dart';
 import 'package:owl_tech_pdf_scaner/widgets/сustom_slider.dart';
+import '../screens/test.dart';
 import 'editable_movable_text.dart';
 import '../models/scan_file.dart';
 import 'package:image/image.dart' as img;
+import 'package:snappy_list_view/snappy_list_view.dart';
 import 'dart:math' as math;
 
+/// Виджет для редактирования текста с листингом страниц, позиционированием аннотации и панелью настроек (DraggableScrollableSheet)
 class TextEditWidget extends StatefulWidget {
   final ScanFile file;
   final int? index;
@@ -23,7 +26,7 @@ class TextEditWidget extends StatefulWidget {
 }
 
 class TextEditWidgetState extends State<TextEditWidget> {
-  // Общие параметры для наложения текста (по умолчанию для первой страницы)
+  // Параметры редактирования текста
   String _text = '';
   Color _textColor = Colors.black;
   double _fontSize = 16.sp;
@@ -33,13 +36,14 @@ class TextEditWidgetState extends State<TextEditWidget> {
   final GlobalKey<EditableMovableResizableTextState> textEditKey = GlobalKey();
   final GlobalKey _textBoundaryKey = GlobalKey();
 
+  // GlobalKey для выбранного изображения – он используется для привязки слоя аннотаций к изображению.
+  final GlobalKey _selectedImageKey = GlobalKey();
+
+  // Размеры исходного изображения
   int _imageWidth = 0;
   int _imageHeight = 0;
 
-  double? _displayedWidth;
-  double? _displayedHeight;
-
-  // Для многостраничного режима:
+  // Многостраничный режим
   int _currentPageIndex = 0;
   late PageController _pageController;
 
@@ -57,10 +61,9 @@ class TextEditWidgetState extends State<TextEditWidget> {
     _loadImageSize();
   }
 
-  /// Метод для загрузки размеров изображения (например, из файла)
+  /// Загружаем реальные размеры изображения из файла
   Future<void> _loadImageSize() async {
-    final String path = widget
-        .file.pages[_currentPageIndex]; // или другой способ получения пути
+    final String path = widget.file.pages[_currentPageIndex];
     if (path.isEmpty) return;
     final fileBytes = await File(path).readAsBytes();
     final decoded = img.decodeImage(fileBytes);
@@ -72,72 +75,110 @@ class TextEditWidgetState extends State<TextEditWidget> {
     }
   }
 
-  /// Вычисляет прямоугольник, в котором реально отрисовывается изображение
-  /// внутри контейнера с заданными размерами (с учетом BoxFit.contain).
-  /// [containerSize] – размеры контейнера (например, 361.w x 491.h),
-  /// [originalWidth] и [originalHeight] – реальные размеры исходного изображения.
-  Rect _getImageRectForOriginal(
-      Size containerSize, int originalWidth, int originalHeight) {
-    if (originalWidth == 0 || originalHeight == 0) {
+  /// Вычисляет прямоугольник, в котором изображение отрисовывается с учетом BoxFit.contain
+  Rect _getImageRect(Size containerSize) {
+    if (_imageWidth == 0 || _imageHeight == 0) {
       return Rect.fromLTWH(0, 0, containerSize.width, containerSize.height);
     }
     final double containerAspect = containerSize.width / containerSize.height;
-    final double imageAspect = originalWidth / originalHeight;
+    final double imageAspect = _imageWidth / _imageHeight;
     double scale;
     double offsetX = 0;
     double offsetY = 0;
     if (imageAspect > containerAspect) {
-      // Изображение шире контейнера: масштабируем по ширине.
-      scale = containerSize.width / originalWidth;
-      final double realHeight = originalHeight * scale;
+      scale = containerSize.width / _imageWidth;
+      final double realHeight = _imageHeight * scale;
       offsetY = (containerSize.height - realHeight) / 2;
       return Rect.fromLTWH(0, offsetY, containerSize.width, realHeight);
     } else {
-      // Изображение выше контейнера: масштабируем по высоте.
-      scale = containerSize.height / originalHeight;
-      final double realWidth = originalWidth * scale;
+      scale = containerSize.height / _imageHeight;
+      final double realWidth = _imageWidth * scale;
       offsetX = (containerSize.width - realWidth) / 2;
       return Rect.fromLTWH(offsetX, 0, realWidth, containerSize.height);
     }
   }
 
-  void updateImage(LocalKey key) {
-    setState(() {
-      imageKey = key;
-    });
-  }
+  /// Метод для построения области с изображением.
+  /// Если изображение выбрано (isSelected == true), то поверх него располагается слой с аннотациями,
+  /// реализованный через Stack, что обеспечивает корректное позиционирование независимо от прокрутки.
+  Widget _buildImageArea(String imagePath, double itemHeight, bool withShadow,
+      {bool isSelected = false}) {
+    final double containerWidth = 361.w;
 
-  double getInitialChildSize(BuildContext context, bool editMode) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    if (screenHeight >= 800) {
-      return editMode ? 0.8 : 0.45;
-    } else {
-      return editMode ? 0.82 : 0.50;
+    Widget imageWidget = ClipRRect(
+      borderRadius: BorderRadius.circular(12.r),
+      child: Image.file(
+        File(imagePath),
+        key: imageKey, // для принудительного обновления
+        fit: BoxFit.contain,
+        color: withShadow ? Colors.black.withAlpha(128) : null,
+        colorBlendMode: withShadow ? BlendMode.darken : null,
+      ),
+    );
+
+    Widget imageWidgetBack = ClipRRect(
+      borderRadius: BorderRadius.circular(12.r),
+      child: Image.file(
+        File(imagePath),
+        fit: BoxFit.contain,
+        color: withShadow ? Colors.black.withAlpha(128) : null,
+        colorBlendMode: withShadow ? BlendMode.darken : null,
+      ),
+    );
+
+    // Если изображение выбрано, оборачиваем его в Stack с наложением аннотаций.
+    if (isSelected) {
+      imageWidget = Stack(
+        children: [
+          Positioned.fill(child: imageWidgetBack),
+          Positioned.fill(child: imageWidget),
+          // Слой аннотаций, занимающий всю область изображения.
+          // Виджет редактируемого текста (с возможностью перемещения/масштабирования)
+          Positioned.fill(
+            child: EditableMovableResizableText(
+              key: ValueKey(_currentPageIndex),
+              initialPosition: _textOffset,
+              initialText: _text,
+              textColor: _textColor,
+              fontSize: _fontSize,
+              onPositionChanged: (newPosition) {
+                setState(() {
+                  _textOffset = newPosition;
+                });
+              },
+              onTextChanged: (newText) {
+                setState(() {
+                  _text = newText;
+                  isEditMode = false;
+                });
+              },
+              isEditMode: (value) {
+                setState(() {
+                  isEditMode = value;
+                });
+              },
+              textBoundaryKey: _textBoundaryKey,
+            ),
+          ),
+        ],
+      );
     }
+
+    return Align(
+      alignment: Alignment.center,
+      child: Padding(
+        padding: EdgeInsets.only(top: 24.h),
+        child: SizedBox(
+          key: isSelected ? _selectedImageKey : null,
+          width: containerWidth,
+          height: itemHeight,
+          child: imageWidget,
+        ),
+      ),
+    );
   }
 
-  double getMinChildSize(BuildContext context, bool editMode) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    if (screenHeight >= 800) {
-      return editMode ? 0.1 : 0.1;
-    } else {
-      return editMode ? 0.1 : 0.1;
-    }
-  }
-
-  double getMaxChildSize(BuildContext context, bool editMode) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    if (screenHeight >= 800) {
-      return editMode ? 0.8 : 0.45;
-    } else {
-      return editMode ? 0.82 : 0.50;
-    }
-  }
-
-  /// Сохраняем наложенный текст для текущей страницы.
-  /// Используется текущий путь из widget.file.pages[_currentPageIndex]
-  /// Метод для сохранения наложенного текста на изображение,
-  /// используя скриншот виджета с текстом (обернутого в RepaintBoundary).
+  /// Сохраняем текст, наложенный на изображение, посредством скриншота текстового блока
   Future<void> saveTextInImage() async {
     final String path = widget.file.pages[_currentPageIndex];
     if (path.isEmpty || _text.isEmpty) return;
@@ -153,48 +194,44 @@ class TextEditWidgetState extends State<TextEditWidget> {
       final int originalWidth = originalImage.width;
       final int originalHeight = originalImage.height;
 
-      // Задаём размеры контейнера, в котором изображение отображается
-      final double containerWidth = 361.w;
-      final double containerHeight = 491.h;
-      final Size containerSize = Size(containerWidth, containerHeight);
-
-      // Вычисляем прямоугольник, в котором реально отрисовывается изображение (с учётом BoxFit.contain)
+      // Задаём размеры контейнера, в котором отрисовывается изображение
+      // Если возможно, используем реальные размеры контейнера выбранного изображения
+      Size containerSize = Size(361.w, 491.h); // значения по умолчанию
+      if (_selectedImageKey.currentContext != null) {
+        containerSize =
+            _selectedImageKey.currentContext!.size ?? containerSize;
+      }
       final Rect imageRect = _getImageRect(containerSize);
 
-      // Вычисляем коэффициенты масштабирования относительно отрисованного изображения
+      // Вычисляем коэффициенты масштабирования
       final double scaleX = originalWidth / imageRect.width;
       final double scaleY = originalHeight / imageRect.height;
 
-      // Захватываем скриншот текстового виджета
+      // Захватываем скриншот текстового виджета (обёрнутого в RepaintBoundary)
       final RenderRepaintBoundary boundary = _textBoundaryKey.currentContext!
           .findRenderObject() as RenderRepaintBoundary;
       final double devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
-      final ui.Image textImage = await boundary.toImage(pixelRatio: devicePixelRatio);
-
-      // Получаем логические размеры текстового виджета (как указаны в layout)
+      final ui.Image textImage =
+      await boundary.toImage(pixelRatio: devicePixelRatio);
       final Size textLogicalSize = boundary.size;
 
-      // Вычисляем смещение текста относительно изображения:
-      // _textOffset хранится относительно контейнера, поэтому вычитаем imageRect.topLeft
+      // Вычисляем позицию текста относительно изображения
       final Offset adjustedOffset = _textOffset - imageRect.topLeft;
       final Offset drawOffset = Offset(
         adjustedOffset.dx * scaleX,
         adjustedOffset.dy * scaleY,
       );
 
-      // Вычисляем целевые размеры текстового виджета на итоговом изображении
+      // Вычисляем размеры текстового блока на итоговом изображении
       final double destWidth = textLogicalSize.width * scaleX;
       final double destHeight = textLogicalSize.height * scaleY;
 
-      // Исходный прямоугольник для захваченного изображения текста (полностью)
       final Rect srcRect = Rect.fromLTWH(
         0,
         0,
         textImage.width.toDouble(),
         textImage.height.toDouble(),
       );
-
-      // Целевой прямоугольник, в который будет вписан текст
       final Rect dstRect = Rect.fromLTWH(
         drawOffset.dx,
         drawOffset.dy,
@@ -202,25 +239,15 @@ class TextEditWidgetState extends State<TextEditWidget> {
         destHeight,
       );
 
-      // Создаем холст для комбинирования исходного изображения и текста
+      // Рисуем итоговое изображение с наложенным текстом
       final ui.PictureRecorder recorder = ui.PictureRecorder();
       final Canvas canvas = Canvas(recorder);
 
-      // Рисуем исходное изображение
       canvas.drawImage(originalImage, Offset.zero, Paint());
-
-      // Ограничиваем область отрисовки размерами исходного изображения
-      canvas.clipRect(Rect.fromLTWH(
-        0,
-        0,
-        originalWidth.toDouble(),
-        originalHeight.toDouble(),
-      ));
-
-      // Рисуем текстовый виджет с учетом вычисленного масштабирования и смещения
+      canvas.clipRect(
+          Rect.fromLTWH(0, 0, originalWidth.toDouble(), originalHeight.toDouble()));
       canvas.drawImageRect(textImage, srcRect, dstRect, Paint());
 
-      // Завершаем запись и получаем итоговое изображение
       final ui.Picture picture = recorder.endRecording();
       final ui.Image finalImage =
       await picture.toImage(originalWidth, originalHeight);
@@ -234,7 +261,6 @@ class TextEditWidgetState extends State<TextEditWidget> {
       imageCache.clear();
       imageCache.clearLiveImages();
 
-      // Сбрасываем состояние
       setState(() {
         _text = '';
         _textOffset = Offset(100.w, 100.h);
@@ -246,99 +272,11 @@ class TextEditWidgetState extends State<TextEditWidget> {
     }
   }
 
-  /// Вычисляем прямоугольник, в котором отрисовывается изображение с BoxFit.contain.
-  Rect _getImageRect(Size containerSize) {
-    if (_imageWidth == 0 || _imageHeight == 0) return Rect.zero;
-    final containerAspect = containerSize.width / containerSize.height;
-    final imageAspect = _imageWidth / _imageHeight;
-    double scale;
-    double offsetX = 0;
-    double offsetY = 0;
-    if (imageAspect > containerAspect) {
-      scale = containerSize.width / _imageWidth;
-      final realHeight = _imageHeight * scale;
-      offsetY = (containerSize.height - realHeight) / 2;
-      return Rect.fromLTWH(0, offsetY, containerSize.width, realHeight);
-    } else {
-      scale = containerSize.height / _imageHeight;
-      final realWidth = _imageWidth * scale;
-      offsetX = (containerSize.width - realWidth) / 2;
-      return Rect.fromLTWH(offsetX, 0, realWidth, containerSize.height);
-    }
-  }
-
-  /// Строит область редактирования для аннотаций для конкретной страницы.
-  /// Здесь аналогично вычисляем положение изображения, как в _buildCropUI.
-  Widget _buildTextAnnotationUI(String pagePath) {
-    return Align(
-      alignment: Alignment.topCenter,
-      child: Padding(
-        padding: EdgeInsets.only(top: 24.h),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            // Получаем размеры контейнера, в котором нужно отобразить изображение
-            final Size containerSize =
-                Size(constraints.maxWidth, constraints.maxHeight - 200.h);
-            // Вычисляем прямоугольник изображения по аналогии с _buildCropUI
-            final Rect imageRect = _getImageRect(containerSize);
-
-            return SizedBox(
-              width: containerSize.width,
-              height: containerSize.height,
-              child: _buildImageArea(pagePath),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  /// Метод для построения области с изображением.
-  Widget _buildImageArea(String imagePath) {
-    final double containerWidth = 361.w;
-    final double containerHeight = 491.h;
-    return Align(
-      alignment: Alignment.topCenter,
-      child: Padding(
-        padding: EdgeInsets.only(top: 24.h),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            // Сохраняем реальные размеры контейнера
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (_displayedWidth != constraints.maxWidth ||
-                  _displayedHeight != constraints.maxHeight) {
-                setState(() {
-                  _displayedWidth = constraints.maxWidth;
-                  _displayedHeight = constraints.maxHeight;
-                });
-              }
-            });
-            return SizedBox(
-              width: containerWidth,
-              height: containerHeight,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12.r),
-                child: Image.file(
-                  File(imagePath),
-                  key: imageKey,
-                  //fit: BoxFit.contain,
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  /// При смене страницы в многостраничном режиме:
-  /// 1. Сохраняем изменения для текущей страницы (наложенный текст).
-  /// 2. Сбрасываем состояние (если требуется) и обновляем индекс.
-  Future<void> _onPageChanged(int newPage) async {
+  /// При смене страницы сохраняем изменения и сбрасываем состояние.
+  Future<void> _onPageChanged(int newPage, double nd) async {
     await saveTextInImage();
     setState(() {
       _currentPageIndex = newPage;
-      // При необходимости можно сбрасывать текст и положение для новой страницы:
       _text = '';
       _textOffset = Offset(100.w, 100.h);
       isEditMode = false;
@@ -346,56 +284,76 @@ class TextEditWidgetState extends State<TextEditWidget> {
     });
   }
 
+  void updateImage(LocalKey key) {
+    setState(() {
+      imageKey = key;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Если многостраничный режим
     final bool multiPage = widget.file.pages.length > 1;
+    final double screenHeight = MediaQuery.of(context).size.height;
+    // Для упрощения считаем, что высота выбранного и невыбранного элементов одинакова (50% экрана)
+    final double selectedHeight = screenHeight * 0.50;
+    final double nonSelectedHeight = screenHeight * 0.50;
+
     return Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: AppColors.background,
       body: SizedBox.expand(
         child: Stack(
           children: [
-            // Если многостраничный режим – используем PageView
+            // Если файлов несколько, используем SnappyListView, иначе просто отображаем одно изображение.
             multiPage
-                ? Stack(
-                    children: [
-                      // Основной виджет PageView
-                      PageView.builder(
-                        controller: _pageController,
-                        scrollDirection: Axis.vertical,
-                        itemCount: widget.file.pages.length,
-                        onPageChanged: _onPageChanged,
-                        itemBuilder: (context, index) {
-                          return _buildTextAnnotationUI(
-                              widget.file.pages[index]);
-                        },
-                      ),
-                      // Отображение номера текущей страницы внизу
-                      Positioned(
-                        bottom:
-                            90.h, // отступ от нижнего края (можно регулировать)
-                        left: 0,
-                        right: 0,
-                        child: Center(
-                          child: Container(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 12.w, vertical: 6.h),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12.r),
-                            ),
-                            child: Text(
-                              "${_currentPageIndex + 1} / ${widget.file.pages.length}",
-                              style: AppTextStyle.exo20,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  )
-                : _buildTextAnnotationUI(widget.file.pages.first),
-            // Панель с настройками (DraggableScrollableSheet)
+                ? SnappyListView(
+              snapAlignment: SnapAlignment.static(0.1),
+              snapOnItemAlignment: SnapAlignment.static(0.1),
+              controller: _pageController,
+              scrollDirection: Axis.vertical,
+              itemCount: widget.file.pages.length,
+              itemSnapping: true,
+              physics: const CustomPageViewScrollPhysics(),
+              onPageChanged: _onPageChanged,
+              itemBuilder: (context, index) {
+                final double itemHeight = index == _currentPageIndex
+                    ? selectedHeight
+                    : nonSelectedHeight;
+                return Padding(
+                  padding: EdgeInsets.symmetric(vertical: 5),
+                  child: _buildImageArea(
+                    widget.file.pages[index],
+                    itemHeight,
+                    index != _currentPageIndex, // затемнение для невыбранного элемента
+                    isSelected: index == _currentPageIndex,
+                  ),
+                );
+              },
+            )
+                : _buildImageArea(
+                widget.file.pages.first, _imageHeight.toDouble(), false,
+                isSelected: true),
+            // Индикатор номера страницы (если многостраничный режим)
+            if (multiPage)
+              Positioned(
+                bottom: 90.h,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
+                    child: Text(
+                      "${_currentPageIndex + 1} / ${widget.file.pages.length}",
+                      style: AppTextStyle.exo20,
+                    ),
+                  ),
+                ),
+              ),
+            // Панель настроек внизу (DraggableScrollableSheet)
             DraggableScrollableSheet(
               initialChildSize: getInitialChildSize(context, isEditMode),
               minChildSize: getMinChildSize(context, isEditMode),
@@ -405,7 +363,7 @@ class TextEditWidgetState extends State<TextEditWidget> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius:
-                        BorderRadius.vertical(top: Radius.circular(30.r)),
+                    BorderRadius.vertical(top: Radius.circular(30.r)),
                   ),
                   child: ListView(
                     controller: scrollController,
@@ -479,39 +437,26 @@ class TextEditWidgetState extends State<TextEditWidget> {
                 );
               },
             ),
-            // Виджет редактируемого текста, поверх изображения
-            Positioned.fill(
-              child: EditableMovableResizableText(
-                key: ValueKey(_currentPageIndex),
-                initialPosition: _textOffset,
-                initialText: _text,
-                textColor: _textColor,
-                fontSize: _fontSize,
-                onPositionChanged: (newPosition) {
-                  setState(() {
-                    _textOffset = newPosition;
-                  });
-                },
-                onTextChanged: (newText) {
-                  setState(() {
-                    _text = newText;
-                    isEditMode = false;
-                  });
-                },
-                isEditMode: (value) {
-                  setState(() {
-                    isEditMode = value;
-                  });
-                },
-                textBoundaryKey: _textBoundaryKey,
-              ),
-            ),
+
           ],
         ),
       ),
     );
   }
 
+  double getInitialChildSize(BuildContext context, bool editMode) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    return screenHeight >= 800 ? (editMode ? 0.8 : 0.45) : (editMode ? 0.82 : 0.5);
+  }
+
+  double getMinChildSize(BuildContext context, bool editMode) => 0.1;
+
+  double getMaxChildSize(BuildContext context, bool editMode) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    return screenHeight >= 800 ? (editMode ? 0.8 : 0.45) : (editMode ? 0.82 : 0.5);
+  }
+
+  /// Кружок для выбора цвета текста
   Widget _colorDot(Color color, {bool showBorder = true}) {
     final bool isSelected = (_textColor == color);
     return GestureDetector(
@@ -529,112 +474,9 @@ class TextEditWidgetState extends State<TextEditWidget> {
           shape: BoxShape.circle,
           border: isSelected
               ? Border.all(color: AppColors.black, width: 3.w)
-              : (showBorder
-                  ? Border.all(color: AppColors.greyIcon, width: 2.w)
-                  : null),
+              : (showBorder ? Border.all(color: AppColors.greyIcon, width: 2.w) : null),
         ),
       ),
     );
   }
-  //
-  // /// Метод для сохранения финального изображения с наложенным текстом.
-  // /// Вызывается, например, перед выходом или по отдельной кнопке.
-  // Future<void> saveFinalImage() async {
-  //   // Если многостраничный режим – сохраняем для текущей страницы.
-  //   final String path = widget.file.pages.length > 1
-  //       ? widget.file.pages[_currentPageIndex]
-  //       : widget.file.pages.first;
-  //   if (path.isEmpty || _text.isEmpty) return;
-  //   final file = File(path);
-  //   if (!await file.exists()) return;
-  //   try {
-  //     final fileBytes = await file.readAsBytes();
-  //     final ui.Codec codec = await ui.instantiateImageCodec(fileBytes);
-  //     final ui.FrameInfo frameInfo = await codec.getNextFrame();
-  //     final ui.Image originalImage = frameInfo.image;
-  //     final int originalWidth = originalImage.width;
-  //     final int originalHeight = originalImage.height;
-  //
-  //     // Задаём размеры контейнера, как в макете (отображаемой области)
-  //     final double containerWidth = 361.w;
-  //     final double containerHeight = 491.h;
-  //     final Size containerSize = Size(containerWidth, containerHeight);
-  //
-  //     // Вычисляем прямоугольник, в котором отрисовывается изображение с BoxFit.contain
-  //     // Здесь передаём размеры контейнера и "оригинальные" размеры контейнера (макета),
-  //     // чтобы понять, как изображение масштабируется в макете.
-  //     final Rect imageRect = _getImageRectForOriginal(
-  //       containerSize,
-  //       containerWidth.toInt(),
-  //       containerHeight.toInt(),
-  //     );
-  //
-  //     // Масштаб относительно реально отрисованного изображения в контейнере
-  //     final double scaleX = originalWidth / imageRect.width;
-  //     final double scaleY = originalHeight / imageRect.height;
-  //
-  //     // _textOffset задан относительно контейнера,
-  //     // поэтому корректируем, чтобы получить позицию относительно области изображения
-  //     final Offset adjustedOffset = _textOffset - imageRect.topLeft;
-  //     final double drawX = adjustedOffset.dx * scaleX;
-  //     final double drawY = adjustedOffset.dy * scaleY;
-  //
-  //     // Создаём TextSpan и TextPainter.
-  //     // Убираем ограничение по ширине, чтобы текст полностью отрисовался, даже если выходит за границы.
-  //     final textSpan = TextSpan(
-  //       text: _text,
-  //       style: TextStyle(fontSize: _fontSize * scaleX, color: _textColor),
-  //     );
-  //     final textPainter = TextPainter(
-  //       text: textSpan,
-  //       textDirection: TextDirection.ltr,
-  //     );
-  //     // Вызываем layout без ограничения по maxWidth,
-  //     // чтобы получить полные размеры текста.
-  //     textPainter.layout();
-  //
-  //     // Определяем boundingRect для текста (на финальном изображении)
-  //     final Rect textRect =
-  //         Rect.fromLTWH(drawX, drawY, textPainter.width, textPainter.height);
-  //
-  //     // Вычисляем объединяющий прямоугольник для исходного изображения (начиная с 0,0)
-  //     // и текстового блока, чтобы итоговое изображение вместило оба элемента.
-  //     final double unionLeft = math.min(0, textRect.left);
-  //     final double unionTop = math.min(0, textRect.top);
-  //     final double unionRight =
-  //         math.max(originalWidth.toDouble(), textRect.right);
-  //     final double unionBottom =
-  //         math.max(originalHeight.toDouble(), textRect.bottom);
-  //     final int newWidth = (unionRight - unionLeft).ceil();
-  //     final int newHeight = (unionBottom - unionTop).ceil();
-  //
-  //     final ui.PictureRecorder recorder = ui.PictureRecorder();
-  //     final Canvas canvas = Canvas(recorder);
-  //
-  //     // Рисуем исходное изображение с учетом смещения, чтобы его верхний левый угол оказался в (−unionLeft, −unionTop)
-  //     canvas.drawImage(originalImage, Offset(-unionLeft, -unionTop), Paint());
-  //
-  //     // Рисуем текст: смещаем координаты так, чтобы они корректно отобразились относительно нового холста
-  //     textPainter.paint(canvas, Offset(drawX - unionLeft, drawY - unionTop));
-  //
-  //     final ui.Picture picture = recorder.endRecording();
-  //     // Создаем итоговое изображение с новыми размерами, чтобы вместить и фон, и текст полностью
-  //     final ui.Image finalImage = await picture.toImage(newWidth, newHeight);
-  //     final ByteData? finalByteData =
-  //         await finalImage.toByteData(format: ui.ImageByteFormat.png);
-  //     if (finalByteData == null) return;
-  //     final Uint8List finalBytes = finalByteData.buffer.asUint8List();
-  //     await file.writeAsBytes(finalBytes);
-  //     imageCache.clear();
-  //     imageCache.clearLiveImages();
-  //     setState(() {
-  //       _text = '';
-  //       _textOffset = Offset(100.w, 100.h);
-  //       isEditMode = false;
-  //       imageKey = UniqueKey();
-  //     });
-  //   } catch (e) {
-  //     debugPrint('Ошибка при сохранении изображения с текстом: $e');
-  //   }
-  // }
 }
