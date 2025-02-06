@@ -72,7 +72,7 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
 
   Future<bool> _showSubscriptionDialog() async {
     // Проверяем наличие активной подписки через RevenueCat
-    bool hasSubscription = await RevenueCatService().isUserSubscribed();
+    bool hasSubscription = true;//await RevenueCatService().isUserSubscribed();
 
     if (hasSubscription) {
       // Если подписка активна, разрешаем использовать режим Pen

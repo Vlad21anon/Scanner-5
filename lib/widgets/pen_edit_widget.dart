@@ -15,8 +15,26 @@ import 'package:owl_tech_pdf_scaner/widgets/handwriting_painter.dart';
 import 'package:owl_tech_pdf_scaner/widgets/сustom_slider.dart';
 import 'package:owl_tech_pdf_scaner/widgets/resizable_note.dart';
 import 'package:image/image.dart' as img;
+import 'package:snappy_list_view/snappy_list_view.dart';
 
 import '../blocs/signatures_cubit.dart';
+
+/// Пример собственного класса для кастомной физики (как в примере из библиотеки)
+class CustomPageViewScrollPhysics extends ScrollPhysics {
+  const CustomPageViewScrollPhysics({super.parent});
+
+  @override
+  CustomPageViewScrollPhysics applyTo(ScrollPhysics? ancestor) {
+    return CustomPageViewScrollPhysics(parent: buildParent(ancestor));
+  }
+
+  @override
+  SpringDescription get spring => const SpringDescription(
+        mass: 50,
+        stiffness: 100,
+        damping: 0.2,
+      );
+}
 
 class PenEditWidget extends StatefulWidget {
   // Для поддержки нескольких файлов (или страниц) можно использовать поле pages,
@@ -66,7 +84,8 @@ class PenEditWidgetState extends State<PenEditWidget> {
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(initialPage: widget.index ?? 0);
+    _pageController =
+        PageController(initialPage: widget.index ?? 0, viewportFraction: 0.7);
     _currentPageIndex = widget.index ?? 0;
     _loadImageSize();
   }
@@ -81,7 +100,7 @@ class PenEditWidgetState extends State<PenEditWidget> {
   }
 
   /// При смене страницы сохраняем изменения и очищаем размещённые на экране подписи.
-  Future<void> _onPageChanged(int newPage) async {
+  Future<void> _onPageChanged(int newPage, double nd) async {
     await saveAnnotatedImage();
     setState(() {
       _currentPageIndex = newPage;
@@ -134,6 +153,12 @@ class PenEditWidgetState extends State<PenEditWidget> {
     final double containerWidth = 361.w;
     final double containerHeight = 491.h;
 
+    final double screenHeight = MediaQuery.of(context).size.height;
+    final double selectedHeight =
+        screenHeight * 0.50; // выбранный элемент – 80% высоты экрана
+    final double nonSelectedHeight = screenHeight *
+        0.50; // для остальных немного меньше, чтобы обеспечить плавный переход
+
     return Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: AppColors.background,
@@ -144,16 +169,26 @@ class PenEditWidgetState extends State<PenEditWidget> {
             children: [
               // Если файлов несколько, используем PageView, иначе просто отображаем одно изображение
               multiPage
-                  ? PageView.builder(
+                  ? SnappyListView(
                       controller: _pageController,
                       scrollDirection: Axis.vertical,
                       itemCount: widget.file.pages.length,
+                      itemSnapping: true,
+                      physics: const CustomPageViewScrollPhysics(),
                       onPageChanged: _onPageChanged,
                       itemBuilder: (context, index) {
-                        return _buildImageArea(widget.file.pages[index]);
+                        // Для каждого элемента выбираем высоту в зависимости от того, выбран ли он
+                        final double itemHeight = index == _currentPageIndex
+                            ? selectedHeight
+                            : nonSelectedHeight;
+                        return Padding(
+                            padding: EdgeInsets.symmetric(vertical: 20),
+                            child: _buildImageArea(widget.file.pages[index],
+                                itemHeight, index != _currentPageIndex));
                       },
                     )
-                  : _buildImageArea(widget.file.pages.first),
+                  : _buildImageArea(
+                      widget.file.pages.first, _imageHeight.toDouble(), false),
               // Размещаем подписанные записи (ResizableNote) поверх изображения.
               // Оборачиваем их в Align+ClipRRect, чтобы они не выходили за рамки изображения.
               Align(
@@ -510,38 +545,26 @@ class PenEditWidgetState extends State<PenEditWidget> {
   }
 
   /// Метод для построения области с изображением.
-  Widget _buildImageArea(String imagePath) {
+  /// Параметр [itemHeight] позволяет задать высоту контейнера для изображения.
+  Widget _buildImageArea(String imagePath, double itemHeight, bool withShadow) {
     final double containerWidth = 361.w;
-    final double containerHeight = 491.h;
     return Align(
-      alignment: Alignment.topCenter,
+      alignment: Alignment.center,
       child: Padding(
         padding: EdgeInsets.only(top: 24.h),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            // Сохраняем реальные размеры контейнера
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (_displayedWidth != constraints.maxWidth ||
-                  _displayedHeight != constraints.maxHeight) {
-                setState(() {
-                  _displayedWidth = constraints.maxWidth;
-                  _displayedHeight = constraints.maxHeight;
-                });
-              }
-            });
-            return SizedBox(
-              width: containerWidth,
-              height: containerHeight,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12.r),
-                child: Image.file(
-                  File(imagePath),
-                  key: imageKey,
-                  //fit: BoxFit.contain,
-                ),
-              ),
-            );
-          },
+        child: SizedBox(
+          width: containerWidth,
+          height: itemHeight,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12.r),
+            child: Image.file(
+              File(imagePath),
+              key: UniqueKey(), // можно обновлять ключ для перерисовки
+              fit: BoxFit.contain,
+              color: withShadow ? Colors.black.withValues(alpha: 0.5) : null,
+              colorBlendMode: withShadow ? BlendMode.darken : null,
+            ),
+          ),
         ),
       ),
     );
@@ -582,7 +605,8 @@ class PenEditWidgetState extends State<PenEditWidget> {
 
       // Устанавливаем clipRect равным размерам исходного изображения.
       // Таким образом, всё, что выходит за его пределы, будет обрезано.
-      canvas.clipRect(Rect.fromLTWH(0, 0, originalWidth.toDouble(), originalHeight.toDouble()));
+      canvas.clipRect(Rect.fromLTWH(
+          0, 0, originalWidth.toDouble(), originalHeight.toDouble()));
 
       // Получаем подписанные записи (signatures), размещённые поверх изображения.
       final signatures = _placedSignatures;
@@ -596,8 +620,10 @@ class PenEditWidgetState extends State<PenEditWidget> {
         );
 
         // Вычисляем масштаб подписи относительно изображения.
-        final double noteScaleX = (note.size.width / note.baseSize.width) * scaleX;
-        final double noteScaleY = (note.size.height / note.baseSize.height) * scaleY;
+        final double noteScaleX =
+            (note.size.width / note.baseSize.width) * scaleX;
+        final double noteScaleY =
+            (note.size.height / note.baseSize.height) * scaleY;
 
         // Рисуем линии подписи.
         for (int i = 0; i < note.points.length - 1; i++) {
@@ -632,9 +658,9 @@ class PenEditWidgetState extends State<PenEditWidget> {
 
       final ui.Picture picture = recorder.endRecording();
       final ui.Image finalImage =
-      await picture.toImage(originalWidth, originalHeight);
+          await picture.toImage(originalWidth, originalHeight);
       final ByteData? finalByteData =
-      await finalImage.toByteData(format: ui.ImageByteFormat.png);
+          await finalImage.toByteData(format: ui.ImageByteFormat.png);
       if (finalByteData == null) return;
       final Uint8List finalBytes = finalByteData.buffer.asUint8List();
 
@@ -657,7 +683,8 @@ class PenEditWidgetState extends State<PenEditWidget> {
 
   /// Метод для загрузки размеров изображения (например, из файла)
   Future<void> _loadImageSize() async {
-    final String path = widget.file.pages[_currentPageIndex]; // или другой способ получения пути
+    final String path = widget
+        .file.pages[_currentPageIndex]; // или другой способ получения пути
     if (path.isEmpty) return;
     final fileBytes = await File(path).readAsBytes();
     final decoded = img.decodeImage(fileBytes);

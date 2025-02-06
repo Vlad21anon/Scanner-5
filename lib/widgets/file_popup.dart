@@ -9,7 +9,6 @@ import 'package:owl_tech_pdf_scaner/services/navigation_service.dart';
 import '../app/app_shadows.dart';
 import '../app/app_text_style.dart';
 import '../blocs/files_cubit.dart';
-import '../screens/subscription_selection_screen.dart';
 import '../services/file_share_service.dart';
 import '../services/revenuecat_service.dart';
 

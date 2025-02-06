@@ -55,6 +55,7 @@ dependencies:
   flutter_svg: ^2.0.17
   visibility_detector: ^0.2.2
   url_launcher: ^6.3.1
+  snappy_list_view: ^0.1.0
 
 dev_dependencies:
   flutter_test:
