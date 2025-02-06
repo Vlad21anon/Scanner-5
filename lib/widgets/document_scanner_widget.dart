@@ -60,12 +60,15 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
   }
 
   double getOffsetAdjustmentY(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    if (screenHeight >= 800) {
-      return -85;
-    } else {
-      return -45;
-    }
+    final mediaQuery = MediaQuery.of(context);
+    final screenHeight = mediaQuery.size.height;
+    final topPadding = mediaQuery.padding.top;
+
+    // Пример: смещение вычисляется как 10% от высоты экрана с учетом верхнего отступа.
+    // Можно подбирать коэффициенты в зависимости от дизайна.
+    double dynamicOffset = -(screenHeight * 0.01);
+
+    return dynamicOffset;
   }
 
   // ResolutionPreset.medium,
