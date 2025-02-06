@@ -177,8 +177,8 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
           ),
           Positioned(
             top: 60.h,
-            left: 16.w,
-            right: 16.w,
+            left: 0.w,
+            right: 0.w,
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.h),
               child: Row(
