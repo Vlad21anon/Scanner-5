@@ -27,6 +27,7 @@ class EditableMovableResizableText extends StatefulWidget {
   final ValueChanged<bool> isEditMode;
   final Color textColor;
   final double fontSize;
+  final GlobalKey textBoundaryKey;
 
   const EditableMovableResizableText({
     super.key,
@@ -36,7 +37,7 @@ class EditableMovableResizableText extends StatefulWidget {
     required this.onTextChanged,
     required this.isEditMode,
     this.textColor = Colors.black,
-    this.fontSize = 16.0,
+    this.fontSize = 16.0, required this.textBoundaryKey,
   });
 
   @override
@@ -80,8 +81,8 @@ class EditableMovableResizableTextState
 
   bool _positionInitialized = false;
 
-  // Ключ для RepaintBoundary, оборачивающего только виджет Text
-  final GlobalKey _textBoundaryKey = GlobalKey();
+  // // Ключ для RepaintBoundary, оборачивающего только виджет Text
+  // final GlobalKey _textBoundaryKey = GlobalKey();
 
   @override
   void initState() {
@@ -115,7 +116,7 @@ class EditableMovableResizableTextState
 
   /// Функция захвата изображения только текстового виджета
   Future<ui.Image> captureTextImage({double pixelRatio = 3.0}) async {
-    RenderRepaintBoundary boundary = _textBoundaryKey.currentContext!
+    RenderRepaintBoundary boundary = widget.textBoundaryKey.currentContext!
         .findRenderObject() as RenderRepaintBoundary;
     return await boundary.toImage(pixelRatio: pixelRatio);
   }
@@ -174,7 +175,7 @@ class EditableMovableResizableTextState
                         // Основной контент: текст или TextField для редактирования
                         Positioned.fill(
                           child: Container(
-                            padding: EdgeInsets.all(6.r),
+                            //padding: EdgeInsets.all(6.r),
                             alignment: Alignment.center,
                             child: _isEditing
                                 ? TextField(
@@ -196,7 +197,7 @@ class EditableMovableResizableTextState
                                     },
                                   )
                                 : RepaintBoundary(
-                                    key: _textBoundaryKey,
+                                    key: widget.textBoundaryKey,
                                     child: Text(
                                       _text,
                                       style: TextStyle(

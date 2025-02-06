@@ -80,8 +80,9 @@ class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
 
   @override
   void didChangeDependencies() {
-    super.didChangeDependencies();
+    _loadImageSize();
     _currentPageIndex = widget.index ?? 0;
+    super.didChangeDependencies();
   }
 
   /// Загружаем размеры изображения для текущей страницы

@@ -59,6 +59,7 @@ class PenEditWidgetState extends State<PenEditWidget> {
   @override
   void didChangeDependencies() {
     _currentPageIndex = widget.index ?? 0;
+    _loadImageSize();
     super.didChangeDependencies();
   }
 
@@ -536,7 +537,7 @@ class PenEditWidgetState extends State<PenEditWidget> {
                 child: Image.file(
                   File(imagePath),
                   key: imageKey,
-                  fit: BoxFit.contain,
+                  //fit: BoxFit.contain,
                 ),
               ),
             );
@@ -546,6 +547,7 @@ class PenEditWidgetState extends State<PenEditWidget> {
     );
   }
 
+  /// Метод для сохранения аннотированного изображения для текущей страницы.
   /// Метод для сохранения аннотированного изображения для текущей страницы.
   Future<void> saveAnnotatedImage() async {
     final path = currentPagePath;
@@ -561,40 +563,43 @@ class PenEditWidgetState extends State<PenEditWidget> {
       final int originalHeight = originalImage.height;
 
       // Задаём размеры контейнера, в котором изображение отображается.
-      // Например, в PenEditWidget они заданы как:
       final double containerWidth = 361.w;
       final double containerHeight = 491.h;
       final Size containerSize = Size(containerWidth, containerHeight);
 
-      // Вычисляем прямоугольник, в котором реально отрисовывается изображение с BoxFit.contain
+      // Вычисляем прямоугольник, в котором реально отрисовывается изображение с BoxFit.contain.
       final Rect imageRect = _getImageRect(containerSize);
 
-      // Вычисляем коэффициенты масштабирования относительно отрисованного изображения
+      // Вычисляем коэффициенты масштабирования относительно отрисованного изображения.
       final double scaleX = originalWidth / imageRect.width;
       final double scaleY = originalHeight / imageRect.height;
 
       final ui.PictureRecorder recorder = ui.PictureRecorder();
       final Canvas canvas = Canvas(recorder);
 
-      // Рисуем оригинальное изображение (на всю его область)
+      // Рисуем исходное изображение (на всю его область).
       canvas.drawImage(originalImage, Offset.zero, Paint());
 
-      // Получаем подписанные записи из кубита
+      // Устанавливаем clipRect равным размерам исходного изображения.
+      // Таким образом, всё, что выходит за его пределы, будет обрезано.
+      canvas.clipRect(Rect.fromLTWH(0, 0, originalWidth.toDouble(), originalHeight.toDouble()));
+
+      // Получаем подписанные записи (signatures), размещённые поверх изображения.
       final signatures = _placedSignatures;
       for (var note in signatures) {
-        // note.offset из подписей, как правило, задаётся относительно контейнера.
-        // Чтобы получить координаты относительно изображения, вычтем imageRect.topLeft.
+        // Смещаем позицию подписи: note.offset задаётся относительно контейнера,
+        // поэтому вычитаем imageRect.topLeft, чтобы получить координаты относительно изображения.
         final Offset adjustedOffset = note.offset - imageRect.topLeft;
         final Offset notePos = Offset(
           adjustedOffset.dx * scaleX,
           adjustedOffset.dy * scaleY,
         );
 
-        // Вычисляем масштаб подписи относительно изображения
+        // Вычисляем масштаб подписи относительно изображения.
         final double noteScaleX = (note.size.width / note.baseSize.width) * scaleX;
         final double noteScaleY = (note.size.height / note.baseSize.height) * scaleY;
 
-        // Рисуем линии подписи
+        // Рисуем линии подписи.
         for (int i = 0; i < note.points.length - 1; i++) {
           final DrawPoint? current = note.points[i];
           final DrawPoint? next = note.points[i + 1];
@@ -632,6 +637,8 @@ class PenEditWidgetState extends State<PenEditWidget> {
       await finalImage.toByteData(format: ui.ImageByteFormat.png);
       if (finalByteData == null) return;
       final Uint8List finalBytes = finalByteData.buffer.asUint8List();
+
+      // Перезаписываем файл итоговым изображением.
       await file.writeAsBytes(finalBytes);
       imageCache.clear();
       imageCache.clearLiveImages();

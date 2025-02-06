@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
 import 'package:owl_tech_pdf_scaner/app/app_text_style.dart';
@@ -30,6 +31,7 @@ class TextEditWidgetState extends State<TextEditWidget> {
   bool isEditMode = false;
   LocalKey imageKey = UniqueKey();
   final GlobalKey<EditableMovableResizableTextState> textEditKey = GlobalKey();
+  final GlobalKey _textBoundaryKey = GlobalKey();
 
   int _imageWidth = 0;
   int _imageHeight = 0;
@@ -37,6 +39,12 @@ class TextEditWidgetState extends State<TextEditWidget> {
   // Для многостраничного режима:
   int _currentPageIndex = 0;
   late PageController _pageController;
+
+  @override
+  void didChangeDependencies() {
+    _loadImageSize();
+    super.didChangeDependencies();
+  }
 
   @override
   void initState() {
@@ -125,14 +133,17 @@ class TextEditWidgetState extends State<TextEditWidget> {
 
   /// Сохраняем наложенный текст для текущей страницы.
   /// Используется текущий путь из widget.file.pages[_currentPageIndex]
+  /// Метод для сохранения наложенного текста на изображение,
+  /// используя скриншот виджета с текстом (обернутого в RepaintBoundary).
   Future<void> saveTextInImage() async {
+    // Получаем путь для текущей страницы из списка страниц файла.
     final String path = widget.file.pages[_currentPageIndex];
     if (path.isEmpty || _text.isEmpty) return;
     final file = File(path);
     if (!await file.exists()) return;
 
     try {
-      // Загружаем исходное изображение
+      // Загружаем исходное изображение.
       final fileBytes = await file.readAsBytes();
       final ui.Codec codec = await ui.instantiateImageCodec(fileBytes);
       final ui.FrameInfo frameInfo = await codec.getNextFrame();
@@ -140,58 +151,67 @@ class TextEditWidgetState extends State<TextEditWidget> {
       final int originalWidth = originalImage.width;
       final int originalHeight = originalImage.height;
 
-      // Размеры контейнера (как в макете)
+      // Задаем размеры контейнера, в котором отображается изображение.
       final double containerWidth = 361.w;
       final double containerHeight = 491.h;
-      final Size containerSize = Size(containerWidth, containerHeight);
 
-      // Вычисляем прямоугольник, в котором реально отрисовывается изображение в контейнере (BoxFit.contain)
-      final Rect imageRect = _getImageRect(containerSize);
+      // Захватываем скриншот виджета с текстом.
+      final RenderRepaintBoundary boundary = _textBoundaryKey.currentContext!
+          .findRenderObject() as RenderRepaintBoundary;
+      final ui.Image textImage = await boundary.toImage(pixelRatio: 3.0);
 
-      // Коэффициенты масштабирования для перевода координат из макета в координаты исходного изображения
-      final double scaleX = originalWidth / imageRect.width;
-      final double scaleY = originalHeight / imageRect.height;
+      // Вычисляем коэффициенты масштабирования между размерами контейнера и исходным изображением.
+      final double scaleX = originalWidth / containerWidth;
+      final double scaleY = originalHeight / containerHeight;
 
-      // Смещаем позицию текста: _textOffset задан относительно контейнера, поэтому вычитаем imageRect.topLeft
-      final Offset adjustedOffset = _textOffset - imageRect.topLeft;
-      final double drawX = adjustedOffset.dx * scaleX;
-      final double drawY = adjustedOffset.dy * scaleY;
+      // Вычисляем прямоугольник, в котором отрисовывается изображение в контейнере.
+      // Можно использовать тот же метод _getImageRect:
+      final Rect containerRect = Rect.fromLTWH(0, 0, containerWidth, containerHeight);
+      // Вычисляем прямоугольник изображения относительно контейнера.
+      final Rect imageRect = _getImageRect(Size(containerWidth, containerHeight));
 
-      // Создаем TextSpan и TextPainter для отрисовки текста (без ограничения по ширине)
-      final textSpan = TextSpan(
-        text: _text,
-        style: TextStyle(fontSize: _fontSize * scaleX, color: _textColor),
+      // Теперь вычисляем смещение текста относительно imageRect.
+      final Offset relativeOffset = _textOffset - imageRect.topLeft;
+
+      // Масштабируем это смещение.
+      final Offset drawOffset = Offset(
+        relativeOffset.dx * scaleX,
+        relativeOffset.dy * scaleY,
       );
-      final textPainter = TextPainter(
-        text: textSpan,
-        textDirection: TextDirection.ltr,
-      );
-      textPainter.layout(); // Получаем реальные размеры текста
 
-      // Создаем холст итогового изображения с размерами исходного фото
+      // Создаем холст для комбинирования исходного изображения и скриншота текста.
       final ui.PictureRecorder recorder = ui.PictureRecorder();
       final Canvas canvas = Canvas(recorder);
 
-      // Рисуем исходное изображение (оно не меняется по размеру)
+      // Рисуем исходное изображение.
       canvas.drawImage(originalImage, Offset.zero, Paint());
 
-      // Устанавливаем clipRect равным размерам исходного изображения – таким образом, текст вне границ фото не будет виден
-      canvas.clipRect(Rect.fromLTWH(0, 0, originalWidth.toDouble(), originalHeight.toDouble()));
+      // Устанавливаем clipRect, чтобы текст, выходящий за пределы изображения, обрезался.
+      canvas.clipRect(Rect.fromLTWH(
+        0,
+        0,
+        originalWidth.toDouble(),
+        originalHeight.toDouble(),
+      ));
 
-      // Отрисовываем текст на холсте по вычисленным координатам
-      textPainter.paint(canvas, Offset(drawX, drawY));
+      // Рисуем скриншот виджета с текстом по вычисленным координатам.
+      canvas.drawImage(textImage, drawOffset, Paint());
 
-      // Завершаем запись и получаем итоговое изображение
+      // Завершаем запись и получаем итоговое изображение.
       final ui.Picture picture = recorder.endRecording();
-      final ui.Image finalImage = await picture.toImage(originalWidth, originalHeight);
-      final ByteData? finalByteData = await finalImage.toByteData(format: ui.ImageByteFormat.png);
+      final ui.Image finalImage =
+      await picture.toImage(originalWidth, originalHeight);
+      final ByteData? finalByteData =
+      await finalImage.toByteData(format: ui.ImageByteFormat.png);
       if (finalByteData == null) return;
       final Uint8List finalBytes = finalByteData.buffer.asUint8List();
 
-      // Перезаписываем файл итоговым изображением
+      // Перезаписываем файл итоговым изображением.
       await file.writeAsBytes(finalBytes);
       imageCache.clear();
       imageCache.clearLiveImages();
+
+      // Сбрасываем состояние.
       setState(() {
         _text = '';
         _textOffset = Offset(100.w, 100.h);
@@ -234,7 +254,8 @@ class TextEditWidgetState extends State<TextEditWidget> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             // Получаем размеры контейнера, в котором нужно отобразить изображение
-            final Size containerSize = Size(constraints.maxWidth, constraints.maxHeight - 200.h);
+            final Size containerSize =
+                Size(constraints.maxWidth, constraints.maxHeight - 200.h);
             // Вычисляем прямоугольник изображения по аналогии с _buildCropUI
             final Rect imageRect = _getImageRect(containerSize);
 
@@ -450,6 +471,7 @@ class TextEditWidgetState extends State<TextEditWidget> {
                     isEditMode = value;
                   });
                 },
+                textBoundaryKey: _textBoundaryKey,
               ),
             ),
           ],
@@ -482,101 +504,105 @@ class TextEditWidgetState extends State<TextEditWidget> {
       ),
     );
   }
-
-  /// Метод для сохранения финального изображения с наложенным текстом.
-  /// Вызывается, например, перед выходом или по отдельной кнопке.
-  Future<void> saveFinalImage() async {
-    // Если многостраничный режим – сохраняем для текущей страницы.
-    final String path = widget.file.pages.length > 1
-        ? widget.file.pages[_currentPageIndex]
-        : widget.file.pages.first;
-    if (path.isEmpty || _text.isEmpty) return;
-    final file = File(path);
-    if (!await file.exists()) return;
-    try {
-      final fileBytes = await file.readAsBytes();
-      final ui.Codec codec = await ui.instantiateImageCodec(fileBytes);
-      final ui.FrameInfo frameInfo = await codec.getNextFrame();
-      final ui.Image originalImage = frameInfo.image;
-      final int originalWidth = originalImage.width;
-      final int originalHeight = originalImage.height;
-
-      // Задаём размеры контейнера, как в макете (отображаемой области)
-      final double containerWidth = 361.w;
-      final double containerHeight = 491.h;
-      final Size containerSize = Size(containerWidth, containerHeight);
-
-      // Вычисляем прямоугольник, в котором отрисовывается изображение с BoxFit.contain
-      // Здесь передаём размеры контейнера и "оригинальные" размеры контейнера (макета),
-      // чтобы понять, как изображение масштабируется в макете.
-      final Rect imageRect = _getImageRectForOriginal(
-        containerSize,
-        containerWidth.toInt(),
-        containerHeight.toInt(),
-      );
-
-      // Масштаб относительно реально отрисованного изображения в контейнере
-      final double scaleX = originalWidth / imageRect.width;
-      final double scaleY = originalHeight / imageRect.height;
-
-      // _textOffset задан относительно контейнера,
-      // поэтому корректируем, чтобы получить позицию относительно области изображения
-      final Offset adjustedOffset = _textOffset - imageRect.topLeft;
-      final double drawX = adjustedOffset.dx * scaleX;
-      final double drawY = adjustedOffset.dy * scaleY;
-
-      // Создаём TextSpan и TextPainter.
-      // Убираем ограничение по ширине, чтобы текст полностью отрисовался, даже если выходит за границы.
-      final textSpan = TextSpan(
-        text: _text,
-        style: TextStyle(fontSize: _fontSize * scaleX, color: _textColor),
-      );
-      final textPainter = TextPainter(
-        text: textSpan,
-        textDirection: TextDirection.ltr,
-      );
-      // Вызываем layout без ограничения по maxWidth,
-      // чтобы получить полные размеры текста.
-      textPainter.layout();
-
-      // Определяем boundingRect для текста (на финальном изображении)
-      final Rect textRect = Rect.fromLTWH(drawX, drawY, textPainter.width, textPainter.height);
-
-      // Вычисляем объединяющий прямоугольник для исходного изображения (начиная с 0,0)
-      // и текстового блока, чтобы итоговое изображение вместило оба элемента.
-      final double unionLeft = math.min(0, textRect.left);
-      final double unionTop = math.min(0, textRect.top);
-      final double unionRight = math.max(originalWidth.toDouble(), textRect.right);
-      final double unionBottom = math.max(originalHeight.toDouble(), textRect.bottom);
-      final int newWidth = (unionRight - unionLeft).ceil();
-      final int newHeight = (unionBottom - unionTop).ceil();
-
-      final ui.PictureRecorder recorder = ui.PictureRecorder();
-      final Canvas canvas = Canvas(recorder);
-
-      // Рисуем исходное изображение с учетом смещения, чтобы его верхний левый угол оказался в (−unionLeft, −unionTop)
-      canvas.drawImage(originalImage, Offset(-unionLeft, -unionTop), Paint());
-
-      // Рисуем текст: смещаем координаты так, чтобы они корректно отобразились относительно нового холста
-      textPainter.paint(canvas, Offset(drawX - unionLeft, drawY - unionTop));
-
-      final ui.Picture picture = recorder.endRecording();
-      // Создаем итоговое изображение с новыми размерами, чтобы вместить и фон, и текст полностью
-      final ui.Image finalImage = await picture.toImage(newWidth, newHeight);
-      final ByteData? finalByteData = await finalImage.toByteData(format: ui.ImageByteFormat.png);
-      if (finalByteData == null) return;
-      final Uint8List finalBytes = finalByteData.buffer.asUint8List();
-      await file.writeAsBytes(finalBytes);
-      imageCache.clear();
-      imageCache.clearLiveImages();
-      setState(() {
-        _text = '';
-        _textOffset = Offset(100.w, 100.h);
-        isEditMode = false;
-        imageKey = UniqueKey();
-      });
-    } catch (e) {
-      debugPrint('Ошибка при сохранении изображения с текстом: $e');
-    }
-  }
+  //
+  // /// Метод для сохранения финального изображения с наложенным текстом.
+  // /// Вызывается, например, перед выходом или по отдельной кнопке.
+  // Future<void> saveFinalImage() async {
+  //   // Если многостраничный режим – сохраняем для текущей страницы.
+  //   final String path = widget.file.pages.length > 1
+  //       ? widget.file.pages[_currentPageIndex]
+  //       : widget.file.pages.first;
+  //   if (path.isEmpty || _text.isEmpty) return;
+  //   final file = File(path);
+  //   if (!await file.exists()) return;
+  //   try {
+  //     final fileBytes = await file.readAsBytes();
+  //     final ui.Codec codec = await ui.instantiateImageCodec(fileBytes);
+  //     final ui.FrameInfo frameInfo = await codec.getNextFrame();
+  //     final ui.Image originalImage = frameInfo.image;
+  //     final int originalWidth = originalImage.width;
+  //     final int originalHeight = originalImage.height;
+  //
+  //     // Задаём размеры контейнера, как в макете (отображаемой области)
+  //     final double containerWidth = 361.w;
+  //     final double containerHeight = 491.h;
+  //     final Size containerSize = Size(containerWidth, containerHeight);
+  //
+  //     // Вычисляем прямоугольник, в котором отрисовывается изображение с BoxFit.contain
+  //     // Здесь передаём размеры контейнера и "оригинальные" размеры контейнера (макета),
+  //     // чтобы понять, как изображение масштабируется в макете.
+  //     final Rect imageRect = _getImageRectForOriginal(
+  //       containerSize,
+  //       containerWidth.toInt(),
+  //       containerHeight.toInt(),
+  //     );
+  //
+  //     // Масштаб относительно реально отрисованного изображения в контейнере
+  //     final double scaleX = originalWidth / imageRect.width;
+  //     final double scaleY = originalHeight / imageRect.height;
+  //
+  //     // _textOffset задан относительно контейнера,
+  //     // поэтому корректируем, чтобы получить позицию относительно области изображения
+  //     final Offset adjustedOffset = _textOffset - imageRect.topLeft;
+  //     final double drawX = adjustedOffset.dx * scaleX;
+  //     final double drawY = adjustedOffset.dy * scaleY;
+  //
+  //     // Создаём TextSpan и TextPainter.
+  //     // Убираем ограничение по ширине, чтобы текст полностью отрисовался, даже если выходит за границы.
+  //     final textSpan = TextSpan(
+  //       text: _text,
+  //       style: TextStyle(fontSize: _fontSize * scaleX, color: _textColor),
+  //     );
+  //     final textPainter = TextPainter(
+  //       text: textSpan,
+  //       textDirection: TextDirection.ltr,
+  //     );
+  //     // Вызываем layout без ограничения по maxWidth,
+  //     // чтобы получить полные размеры текста.
+  //     textPainter.layout();
+  //
+  //     // Определяем boundingRect для текста (на финальном изображении)
+  //     final Rect textRect =
+  //         Rect.fromLTWH(drawX, drawY, textPainter.width, textPainter.height);
+  //
+  //     // Вычисляем объединяющий прямоугольник для исходного изображения (начиная с 0,0)
+  //     // и текстового блока, чтобы итоговое изображение вместило оба элемента.
+  //     final double unionLeft = math.min(0, textRect.left);
+  //     final double unionTop = math.min(0, textRect.top);
+  //     final double unionRight =
+  //         math.max(originalWidth.toDouble(), textRect.right);
+  //     final double unionBottom =
+  //         math.max(originalHeight.toDouble(), textRect.bottom);
+  //     final int newWidth = (unionRight - unionLeft).ceil();
+  //     final int newHeight = (unionBottom - unionTop).ceil();
+  //
+  //     final ui.PictureRecorder recorder = ui.PictureRecorder();
+  //     final Canvas canvas = Canvas(recorder);
+  //
+  //     // Рисуем исходное изображение с учетом смещения, чтобы его верхний левый угол оказался в (−unionLeft, −unionTop)
+  //     canvas.drawImage(originalImage, Offset(-unionLeft, -unionTop), Paint());
+  //
+  //     // Рисуем текст: смещаем координаты так, чтобы они корректно отобразились относительно нового холста
+  //     textPainter.paint(canvas, Offset(drawX - unionLeft, drawY - unionTop));
+  //
+  //     final ui.Picture picture = recorder.endRecording();
+  //     // Создаем итоговое изображение с новыми размерами, чтобы вместить и фон, и текст полностью
+  //     final ui.Image finalImage = await picture.toImage(newWidth, newHeight);
+  //     final ByteData? finalByteData =
+  //         await finalImage.toByteData(format: ui.ImageByteFormat.png);
+  //     if (finalByteData == null) return;
+  //     final Uint8List finalBytes = finalByteData.buffer.asUint8List();
+  //     await file.writeAsBytes(finalBytes);
+  //     imageCache.clear();
+  //     imageCache.clearLiveImages();
+  //     setState(() {
+  //       _text = '';
+  //       _textOffset = Offset(100.w, 100.h);
+  //       isEditMode = false;
+  //       imageKey = UniqueKey();
+  //     });
+  //   } catch (e) {
+  //     debugPrint('Ошибка при сохранении изображения с текстом: $e');
+  //   }
+  // }
 }
