@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:owl_tech_pdf_scaner/app/app_colors.dart';
 import 'package:owl_tech_pdf_scaner/app/app_icons.dart';
@@ -9,6 +10,8 @@ import 'package:owl_tech_pdf_scaner/services/navigation_service.dart';
 import 'package:owl_tech_pdf_scaner/widgets/custom_circular_button.dart';
 import 'package:owl_tech_pdf_scaner/widgets/file_card.dart';
 
+import '../blocs/files_cubit.dart';
+
 class ScanningFilesScreen extends StatelessWidget {
   /// Обязательный параметр – файл, страницы которого будут показаны на экране.
   final ScanFile file;
@@ -18,6 +21,11 @@ class ScanningFilesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final navigation = NavigationService();
+    final filesCubit = context.watch<FilesCubit>();
+    // Если в cubit хранится обновлённый файл, используем его вместо file
+    final currentFile = (filesCubit.lastScanFile?.id == file.id)
+        ? filesCubit.lastScanFile!
+        : file;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -49,26 +57,28 @@ class ScanningFilesScreen extends StatelessWidget {
           Expanded(
             child: ListView.separated(
               padding: EdgeInsets.symmetric(horizontal: 16.w),
-              itemCount: file.pages.length,
+              itemCount: currentFile.pages.length,
               separatorBuilder: (context, _) => SizedBox(height: 16.h),
               itemBuilder: (context, index) {
-                final pagePath = file.pages[index];
+                final pagePath = currentFile.pages[index];
                 return GestureDetector(
                   onTap: () {
-                    // При нажатии переходим на экран редактирования PDF для всего файла
+                    // При нажатии переходим на экран редактирования PDF для всего файла,
+                    // передаём актуальный объект currentFile
                     navigation.navigateTo(
                       context,
-                      PdfEditScreen(file: file, index: index),
+                      PdfEditScreen(file: currentFile, index: index),
                     );
                   },
                   child: FileCard(
-                    file: file,
+                    file: currentFile,
+                    index: index,
                     // Для предпросмотра используем конкретную страницу
                     imagePath: pagePath,
                     onTap: () {
                       navigation.navigateTo(
                         context,
-                        PdfEditScreen(file: file),
+                        PdfEditScreen(file: currentFile),
                       );
                     },
                   ),

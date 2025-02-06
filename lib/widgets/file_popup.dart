@@ -14,8 +14,9 @@ import '../services/revenuecat_service.dart';
 
 class FilePopup extends StatelessWidget {
   final ScanFile file;
+  final int? index;
 
-  const FilePopup({super.key, required this.file});
+  const FilePopup({super.key, required this.file, this.index});
 
 
   Future<bool> _showSubscriptionDialog(BuildContext context) async {
@@ -75,7 +76,13 @@ class FilePopup extends StatelessWidget {
               _buildMenuItem(
                 onTap: () {
                   Navigator.pop(context);
-                  context.read<FilesCubit>().removeFile(file.id);
+                  final filesCubit = context.read<FilesCubit>();
+                  // Удаляем только страницу по указанному индексу, а не весь файл
+                  if (index != null) {
+                    filesCubit.removePage(file.id, index!);
+                  } else {
+                    context.read<FilesCubit>().removeFile(file.id);
+                  }
                 },
                 title: 'Delete',
                 icon: AppIcons.deleteBlack14x16,

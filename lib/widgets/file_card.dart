@@ -15,6 +15,7 @@ class FileCard extends StatelessWidget {
 
   /// Новый параметр для передачи конкретного пути к изображению (например, для мультистраничного файла)
   final String? imagePath;
+  final int? index;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
   final bool? isSelectedMode;
@@ -26,6 +27,7 @@ class FileCard extends StatelessWidget {
     this.onLongPress,
     this.isSelectedMode,
     this.imagePath,
+    this.index,
   });
 
   @override
@@ -115,7 +117,7 @@ class FileCard extends StatelessWidget {
                         top: position.dy + position.dx + 16.h,
                         child: Material(
                           color: Colors.transparent,
-                          child: FilePopup(file: file),
+                          child: FilePopup(file: file, index: index),
                         ),
                       ),
                     ],
