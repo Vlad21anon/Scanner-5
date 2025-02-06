@@ -36,6 +36,9 @@ class TextEditWidgetState extends State<TextEditWidget> {
   int _imageWidth = 0;
   int _imageHeight = 0;
 
+  double? _displayedWidth;
+  double? _displayedHeight;
+
   // Для многостраничного режима:
   int _currentPageIndex = 0;
   late PageController _pageController;
@@ -136,14 +139,13 @@ class TextEditWidgetState extends State<TextEditWidget> {
   /// Метод для сохранения наложенного текста на изображение,
   /// используя скриншот виджета с текстом (обернутого в RepaintBoundary).
   Future<void> saveTextInImage() async {
-    // Получаем путь для текущей страницы из списка страниц файла.
     final String path = widget.file.pages[_currentPageIndex];
     if (path.isEmpty || _text.isEmpty) return;
     final file = File(path);
     if (!await file.exists()) return;
 
     try {
-      // Загружаем исходное изображение.
+      // Загружаем исходное изображение
       final fileBytes = await file.readAsBytes();
       final ui.Codec codec = await ui.instantiateImageCodec(fileBytes);
       final ui.FrameInfo frameInfo = await codec.getNextFrame();
@@ -151,42 +153,63 @@ class TextEditWidgetState extends State<TextEditWidget> {
       final int originalWidth = originalImage.width;
       final int originalHeight = originalImage.height;
 
-      // Задаем размеры контейнера, в котором отображается изображение.
+      // Задаём размеры контейнера, в котором изображение отображается
       final double containerWidth = 361.w;
       final double containerHeight = 491.h;
+      final Size containerSize = Size(containerWidth, containerHeight);
 
-      // Захватываем скриншот виджета с текстом.
+      // Вычисляем прямоугольник, в котором реально отрисовывается изображение (с учётом BoxFit.contain)
+      final Rect imageRect = _getImageRect(containerSize);
+
+      // Вычисляем коэффициенты масштабирования относительно отрисованного изображения
+      final double scaleX = originalWidth / imageRect.width;
+      final double scaleY = originalHeight / imageRect.height;
+
+      // Захватываем скриншот текстового виджета
       final RenderRepaintBoundary boundary = _textBoundaryKey.currentContext!
           .findRenderObject() as RenderRepaintBoundary;
-      final ui.Image textImage = await boundary.toImage(pixelRatio: 3.0);
+      final double devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
+      final ui.Image textImage = await boundary.toImage(pixelRatio: devicePixelRatio);
 
-      // Вычисляем коэффициенты масштабирования между размерами контейнера и исходным изображением.
-      final double scaleX = originalWidth / containerWidth;
-      final double scaleY = originalHeight / containerHeight;
+      // Получаем логические размеры текстового виджета (как указаны в layout)
+      final Size textLogicalSize = boundary.size;
 
-      // Вычисляем прямоугольник, в котором отрисовывается изображение в контейнере.
-      // Можно использовать тот же метод _getImageRect:
-      final Rect containerRect = Rect.fromLTWH(0, 0, containerWidth, containerHeight);
-      // Вычисляем прямоугольник изображения относительно контейнера.
-      final Rect imageRect = _getImageRect(Size(containerWidth, containerHeight));
-
-      // Теперь вычисляем смещение текста относительно imageRect.
-      final Offset relativeOffset = _textOffset - imageRect.topLeft;
-
-      // Масштабируем это смещение.
+      // Вычисляем смещение текста относительно изображения:
+      // _textOffset хранится относительно контейнера, поэтому вычитаем imageRect.topLeft
+      final Offset adjustedOffset = _textOffset - imageRect.topLeft;
       final Offset drawOffset = Offset(
-        relativeOffset.dx * scaleX,
-        relativeOffset.dy * scaleY,
+        adjustedOffset.dx * scaleX,
+        adjustedOffset.dy * scaleY,
       );
 
-      // Создаем холст для комбинирования исходного изображения и скриншота текста.
+      // Вычисляем целевые размеры текстового виджета на итоговом изображении
+      final double destWidth = textLogicalSize.width * scaleX;
+      final double destHeight = textLogicalSize.height * scaleY;
+
+      // Исходный прямоугольник для захваченного изображения текста (полностью)
+      final Rect srcRect = Rect.fromLTWH(
+        0,
+        0,
+        textImage.width.toDouble(),
+        textImage.height.toDouble(),
+      );
+
+      // Целевой прямоугольник, в который будет вписан текст
+      final Rect dstRect = Rect.fromLTWH(
+        drawOffset.dx,
+        drawOffset.dy,
+        destWidth,
+        destHeight,
+      );
+
+      // Создаем холст для комбинирования исходного изображения и текста
       final ui.PictureRecorder recorder = ui.PictureRecorder();
       final Canvas canvas = Canvas(recorder);
 
-      // Рисуем исходное изображение.
+      // Рисуем исходное изображение
       canvas.drawImage(originalImage, Offset.zero, Paint());
 
-      // Устанавливаем clipRect, чтобы текст, выходящий за пределы изображения, обрезался.
+      // Ограничиваем область отрисовки размерами исходного изображения
       canvas.clipRect(Rect.fromLTWH(
         0,
         0,
@@ -194,10 +217,10 @@ class TextEditWidgetState extends State<TextEditWidget> {
         originalHeight.toDouble(),
       ));
 
-      // Рисуем скриншот виджета с текстом по вычисленным координатам.
-      canvas.drawImage(textImage, drawOffset, Paint());
+      // Рисуем текстовый виджет с учетом вычисленного масштабирования и смещения
+      canvas.drawImageRect(textImage, srcRect, dstRect, Paint());
 
-      // Завершаем запись и получаем итоговое изображение.
+      // Завершаем запись и получаем итоговое изображение
       final ui.Picture picture = recorder.endRecording();
       final ui.Image finalImage =
       await picture.toImage(originalWidth, originalHeight);
@@ -206,12 +229,12 @@ class TextEditWidgetState extends State<TextEditWidget> {
       if (finalByteData == null) return;
       final Uint8List finalBytes = finalByteData.buffer.asUint8List();
 
-      // Перезаписываем файл итоговым изображением.
+      // Перезаписываем файл итоговым изображением
       await file.writeAsBytes(finalBytes);
       imageCache.clear();
       imageCache.clearLiveImages();
 
-      // Сбрасываем состояние.
+      // Сбрасываем состояние
       setState(() {
         _text = '';
         _textOffset = Offset(100.w, 100.h);
@@ -262,35 +285,44 @@ class TextEditWidgetState extends State<TextEditWidget> {
             return SizedBox(
               width: containerSize.width,
               height: containerSize.height,
-              child: Stack(
-                children: [
-                  // Размещаем изображение согласно вычисленному прямоугольнику
-                  Positioned.fromRect(
-                    rect: imageRect,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12.r),
-                      child: Image.file(
-                        File(pagePath),
-                        key: imageKey,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  ),
-                  // Здесь можно добавить виджеты аннотаций, например, текстовые поля,
-                  // рисование иконок или другие элементы редактирования.
-                  // Пример:
-                  // Positioned(
-                  //   left: imageRect.left + 10,
-                  //   top: imageRect.top + 10,
-                  //   child: Text(
-                  //     'Аннотация',
-                  //     style: TextStyle(
-                  //       color: Colors.red,
-                  //       fontSize: 16.sp,
-                  //     ),
-                  //   ),
-                  // ),
-                ],
+              child: _buildImageArea(pagePath),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  /// Метод для построения области с изображением.
+  Widget _buildImageArea(String imagePath) {
+    final double containerWidth = 361.w;
+    final double containerHeight = 491.h;
+    return Align(
+      alignment: Alignment.topCenter,
+      child: Padding(
+        padding: EdgeInsets.only(top: 24.h),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // Сохраняем реальные размеры контейнера
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (_displayedWidth != constraints.maxWidth ||
+                  _displayedHeight != constraints.maxHeight) {
+                setState(() {
+                  _displayedWidth = constraints.maxWidth;
+                  _displayedHeight = constraints.maxHeight;
+                });
+              }
+            });
+            return SizedBox(
+              width: containerWidth,
+              height: containerHeight,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12.r),
+                child: Image.file(
+                  File(imagePath),
+                  key: imageKey,
+                  //fit: BoxFit.contain,
+                ),
               ),
             );
           },
