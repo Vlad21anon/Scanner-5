@@ -23,9 +23,7 @@ class ScanningFilesScreen extends StatelessWidget {
     final navigation = NavigationService();
     final filesCubit = context.watch<FilesCubit>();
     // Если в cubit хранится обновлённый файл, используем его вместо file
-    final currentFile = (filesCubit.lastScanFile?.id == file.id)
-        ? filesCubit.lastScanFile!
-        : file;
+    final currentFile = filesCubit.lastScanFile;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -54,38 +52,39 @@ class ScanningFilesScreen extends StatelessWidget {
           ),
           SizedBox(height: 26.h),
           // Список страниц выбранного файла
-          Expanded(
-            child: ListView.separated(
-              padding: EdgeInsets.symmetric(horizontal: 16.w),
-              itemCount: currentFile.pages.length,
-              separatorBuilder: (context, _) => SizedBox(height: 16.h),
-              itemBuilder: (context, index) {
-                final pagePath = currentFile.pages[index];
-                return GestureDetector(
-                  onTap: () {
-                    // При нажатии переходим на экран редактирования PDF для всего файла,
-                    // передаём актуальный объект currentFile
-                    navigation.navigateTo(
-                      context,
-                      PdfEditScreen(file: currentFile, index: index),
-                    );
-                  },
-                  child: FileCard(
-                    file: currentFile,
-                    index: index,
-                    // Для предпросмотра используем конкретную страницу
-                    imagePath: pagePath,
+          if (currentFile != null)
+            Expanded(
+              child: ListView.separated(
+                padding: EdgeInsets.symmetric(horizontal: 16.w),
+                itemCount: currentFile.pages.length,
+                separatorBuilder: (context, _) => SizedBox(height: 16.h),
+                itemBuilder: (context, index) {
+                  final pagePath = currentFile.pages[index];
+                  return GestureDetector(
                     onTap: () {
+                      // При нажатии переходим на экран редактирования PDF для всего файла,
+                      // передаём актуальный объект currentFile
                       navigation.navigateTo(
                         context,
-                        PdfEditScreen(file: currentFile),
+                        PdfEditScreen(file: currentFile, index: index),
                       );
                     },
-                  ),
-                );
-              },
+                    child: FileCard(
+                      file: currentFile,
+                      index: index,
+                      // Для предпросмотра используем конкретную страницу
+                      imagePath: pagePath,
+                      onTap: () {
+                        navigation.navigateTo(
+                          context,
+                          PdfEditScreen(file: currentFile),
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
           SizedBox(height: 16.h),
         ],
       ),

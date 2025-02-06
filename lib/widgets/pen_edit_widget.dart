@@ -41,7 +41,7 @@ class PenEditWidgetState extends State<PenEditWidget> {
   final List<DrawPoint?> _currentDrawing = [];
 
   // Локальный список для хранения подписей, добавленных на экран (отображаемых поверх изображения)
-  final List<NoteData> _placedSignatures = [];
+  List<NoteData> _placedSignatures = [];
   double? _displayedWidth;
   double? _displayedHeight;
 
@@ -86,7 +86,7 @@ class PenEditWidgetState extends State<PenEditWidget> {
       _currentPageIndex = newPage;
       _currentDrawing.clear();
       // Очистка подписей, добавленных на экран
-      _placedSignatures.clear();
+      _placedSignatures = [];
       imageKey = UniqueKey();
     });
   }
@@ -580,7 +580,7 @@ class PenEditWidgetState extends State<PenEditWidget> {
       canvas.drawImage(originalImage, Offset.zero, Paint());
 
       // Получаем подписанные записи из кубита
-      final signatures = context.read<SignaturesCubit>().state;
+      final signatures = _placedSignatures;
       for (var note in signatures) {
         // note.offset из подписей, как правило, задаётся относительно контейнера.
         // Чтобы получить координаты относительно изображения, вычтем imageRect.topLeft.

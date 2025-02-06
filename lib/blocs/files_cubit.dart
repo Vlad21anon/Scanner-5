@@ -9,13 +9,23 @@ class FilesCubit extends HydratedCubit<List<ScanFile>> {
 
   /// Метод для удаления страницы по индексу из файла с идентификатором [fileId].
   void removePage(String fileId, int pageIndex) {
-    final updatedList = state.map((file) {
+    // Применяем map, возвращая либо обновлённый файл, либо null (если файл нужно удалить)
+    final updatedList = state
+        .map<ScanFile?>((file) {
       if (file.id == fileId) {
         // Проверка корректности индекса страницы
         if (pageIndex < 0 || pageIndex >= file.pages.length) return file;
         // Создаем новый список страниц без удаляемой страницы
         final updatedPages = List<String>.from(file.pages)..removeAt(pageIndex);
-        // Создаем обновленный объект файла с обновленным списком страниц
+        // Если после удаления страниц их не осталось, возвращаем null (удаляем файл)
+        if (updatedPages.isEmpty) {
+          // Если удаляемый файл совпадает с lastScanFile, сбрасываем его
+          if (lastScanFile != null && lastScanFile!.id == fileId) {
+            lastScanFile = null;
+          }
+          return null;
+        }
+        // Иначе создаем обновленный объект файла с обновленным списком страниц
         final updatedFile = file.copyWith(pages: updatedPages);
         // Если lastScanFile совпадает с редактируемым файлом, обновляем и его
         if (lastScanFile != null && lastScanFile!.id == fileId) {
@@ -24,7 +34,10 @@ class FilesCubit extends HydratedCubit<List<ScanFile>> {
         return updatedFile;
       }
       return file;
-    }).toList();
+    })
+    // Фильтруем null-значения (удаленные файлы)
+        .whereType<ScanFile>()
+        .toList();
     emit(updatedList);
   }
 
