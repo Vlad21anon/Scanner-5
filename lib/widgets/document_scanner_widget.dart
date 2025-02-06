@@ -62,7 +62,6 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
   double getOffsetAdjustmentY(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
     final screenHeight = mediaQuery.size.height;
-    final topPadding = mediaQuery.padding.top;
 
     // Пример: смещение вычисляется как 10% от высоты экрана с учетом верхнего отступа.
     // Можно подбирать коэффициенты в зависимости от дизайна.
