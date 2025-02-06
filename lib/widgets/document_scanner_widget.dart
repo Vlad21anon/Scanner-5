@@ -455,7 +455,7 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
                           child: AspectRatio(
                             aspectRatio: _controller.value.aspectRatio,
                             child: CustomPaint(
-                              //size: Size(constraints.maxWidth, constraints.maxHeight),
+                              size: Size(constraints.maxWidth, constraints.maxHeight),
                               painter: PaperBorderPainter(
                                 corners: _paperCorners!,
                                 cameraImageSize: _cameraImageSize!,
