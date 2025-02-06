@@ -30,10 +30,10 @@ class CustomPageViewScrollPhysics extends ScrollPhysics {
 
   @override
   SpringDescription get spring => const SpringDescription(
-        mass: 50,
-        stiffness: 100,
-        damping: 0.2,
-      );
+    mass: 50,
+    stiffness: 100,
+    damping: 0.2,
+  );
 }
 
 class PenEditWidget extends StatefulWidget {
@@ -58,18 +58,21 @@ class PenEditWidgetState extends State<PenEditWidget> {
   LocalKey imageKey = UniqueKey();
   final List<DrawPoint?> _currentDrawing = [];
 
-  // Локальный список для хранения подписей, добавленных на экран (отображаемых поверх изображения)
+  // Локальный список для хранения подписей (аннотаций), добавленных на экран (отображаемых поверх изображения)
   List<NoteData> _placedSignatures = [];
   double? _displayedWidth;
   double? _displayedHeight;
 
-  // Объявляем размеры изображения.
+  // Объявляем размеры исходного изображения.
   int _imageWidth = 0;
   int _imageHeight = 0;
 
   // Для поддержки нескольких файлов/страниц
   int _currentPageIndex = 0;
   late PageController _pageController;
+
+  // GlobalKey для выбранного изображения – он используется для привязки слоя аннотаций к изображению.
+  final GlobalKey _selectedImageKey = GlobalKey();
 
   bool get multiPage =>
       widget.file.pages.isNotEmpty && widget.file.pages.length > 1;
@@ -101,7 +104,10 @@ class PenEditWidgetState extends State<PenEditWidget> {
 
   /// При смене страницы сохраняем изменения и очищаем размещённые на экране подписи.
   Future<void> _onPageChanged(int newPage, double nd) async {
-    await saveAnnotatedImage();
+    if (_placedSignatures.isNotEmpty) {
+      await saveAnnotatedImage();
+    }
+
     setState(() {
       _currentPageIndex = newPage;
       _currentDrawing.clear();
@@ -113,29 +119,17 @@ class PenEditWidgetState extends State<PenEditWidget> {
 
   double getInitialChildSize(BuildContext context, bool addPenMode) {
     final screenHeight = MediaQuery.of(context).size.height;
-    if (screenHeight >= 800) {
-      return addPenMode ? 0.85 : 0.6;
-    } else {
-      return addPenMode ? 0.95 : 0.55;
-    }
+    return screenHeight >= 800 ? (addPenMode ? 0.85 : 0.6) : (addPenMode ? 0.95 : 0.55);
   }
 
   double getMinChildSize(BuildContext context, bool addPenMode) {
     final screenHeight = MediaQuery.of(context).size.height;
-    if (screenHeight >= 800) {
-      return addPenMode ? 0.85 : 0.1;
-    } else {
-      return addPenMode ? 0.95 : 0.1;
-    }
+    return screenHeight >= 800 ? (addPenMode ? 0.85 : 0.1) : (addPenMode ? 0.95 : 0.1);
   }
 
   double getMaxChildSize(BuildContext context, bool addPenMode) {
     final screenHeight = MediaQuery.of(context).size.height;
-    if (screenHeight >= 800) {
-      return addPenMode ? 0.85 : 0.6;
-    } else {
-      return addPenMode ? 0.95 : 0.55;
-    }
+    return screenHeight >= 800 ? (addPenMode ? 0.85 : 0.6) : (addPenMode ? 0.95 : 0.55);
   }
 
   void updateImage(LocalKey key) {
@@ -146,18 +140,17 @@ class PenEditWidgetState extends State<PenEditWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // Определим размеры области рисования (должны совпадать с размерами контейнера)
+    // Размеры области для рисования (должны совпадать с размерами контейнера)
     final double drawingWidth = 361.w;
     final double drawingHeight = 203.h;
-    // Размеры контейнера для изображения и подписей
+    // Размеры контейнера для изображения
     final double containerWidth = 361.w;
     final double containerHeight = 491.h;
 
     final double screenHeight = MediaQuery.of(context).size.height;
-    final double selectedHeight =
-        screenHeight * 0.50; // выбранный элемент – 80% высоты экрана
-    final double nonSelectedHeight = screenHeight *
-        0.50; // для остальных немного меньше, чтобы обеспечить плавный переход
+    // Для упрощения считаем, что высота выбранного и невыбранного элементов одинакова (50% экрана)
+    final double selectedHeight = screenHeight * 0.50;
+    final double nonSelectedHeight = screenHeight * 0.50;
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
@@ -167,53 +160,35 @@ class PenEditWidgetState extends State<PenEditWidget> {
         child: SizedBox.expand(
           child: Stack(
             children: [
-              // Если файлов несколько, используем PageView, иначе просто отображаем одно изображение
+              // Если файлов несколько, используем SnappyListView, иначе просто отображаем одно изображение.
               multiPage
                   ? SnappyListView(
-                      controller: _pageController,
-                      scrollDirection: Axis.vertical,
-                      itemCount: widget.file.pages.length,
-                      itemSnapping: true,
-                      physics: const CustomPageViewScrollPhysics(),
-                      onPageChanged: _onPageChanged,
-                      itemBuilder: (context, index) {
-                        // Для каждого элемента выбираем высоту в зависимости от того, выбран ли он
-                        final double itemHeight = index == _currentPageIndex
-                            ? selectedHeight
-                            : nonSelectedHeight;
-                        return Padding(
-                            padding: EdgeInsets.symmetric(vertical: 20),
-                            child: _buildImageArea(widget.file.pages[index],
-                                itemHeight, index != _currentPageIndex));
-                      },
-                    )
-                  : _buildImageArea(
-                      widget.file.pages.first, _imageHeight.toDouble(), false),
-              // Размещаем подписанные записи (ResizableNote) поверх изображения.
-              // Оборачиваем их в Align+ClipRRect, чтобы они не выходили за рамки изображения.
-              Align(
-                alignment: Alignment.topCenter,
-                child: Padding(
-                  padding: EdgeInsets.only(top: 24.h),
-                  child: SizedBox(
-                    width: containerWidth,
-                    height: containerHeight,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12.r),
-                      child: Stack(
-                        children: _placedSignatures.map((note) {
-                          return ResizableNote(
-                            note: note,
-                            onUpdate: () {
-                              setState(() {});
-                            },
-                          );
-                        }).toList(),
-                      ),
+                snapAlignment: SnapAlignment.static(0.1),
+                snapOnItemAlignment: SnapAlignment.static(0.1),
+                controller: _pageController,
+                scrollDirection: Axis.vertical,
+                itemCount: widget.file.pages.length,
+                itemSnapping: true,
+                physics: const CustomPageViewScrollPhysics(),
+                onPageChanged: _onPageChanged,
+                itemBuilder: (context, index) {
+                  final double itemHeight = index == _currentPageIndex
+                      ? selectedHeight
+                      : nonSelectedHeight;
+                  return Padding(
+                    padding: EdgeInsets.symmetric(vertical: 5),
+                    child: _buildImageArea(
+                      widget.file.pages[index],
+                      itemHeight,
+                      index != _currentPageIndex, // затемнение для невыбранного элемента
+                      isSelected: index == _currentPageIndex,
                     ),
-                  ),
-                ),
-              ),
+                  );
+                },
+              )
+                  : _buildImageArea(
+                  widget.file.pages.first, _imageHeight.toDouble(), false,
+                  isSelected: true),
               // Отображение индекса текущей страницы (если файлов несколько)
               if (multiPage)
                 Positioned(
@@ -223,7 +198,7 @@ class PenEditWidgetState extends State<PenEditWidget> {
                   child: Center(
                     child: Container(
                       padding:
-                          EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                      EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12.r),
@@ -245,7 +220,7 @@ class PenEditWidgetState extends State<PenEditWidget> {
                     decoration: BoxDecoration(
                       color: AppColors.white,
                       borderRadius:
-                          BorderRadius.vertical(top: Radius.circular(30.r)),
+                      BorderRadius.vertical(top: Radius.circular(30.r)),
                     ),
                     child: ListView(
                       controller: scrollController,
@@ -267,221 +242,221 @@ class PenEditWidgetState extends State<PenEditWidget> {
                         SizedBox(height: 8.h),
                         addPenMode
                             ? Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text('Add sign', style: AppTextStyle.exo20),
-                                  CustomCircularButton(
-                                    withBorder: true,
-                                    withShadow: false,
-                                    onTap: () {
-                                      // При завершении рисования добавляем новую подпись через кубит,
-                                      // если их количество меньше 4.
-                                      if (_currentDrawing.isNotEmpty) {
-                                        final newSignature = NoteData(
-                                          // Предполагается, что NoteData генерирует уникальный id
-                                          points: List.from(_currentDrawing),
-                                          offset: Offset(100.w, 100.w),
-                                          color: _textColor,
-                                          strokeWidth: _fontSize,
-                                          size: Size(150.w, 100.h),
-                                          baseSize: Size(361.w, 203.h),
-                                        );
-                                        final success = context
-                                            .read<SignaturesCubit>()
-                                            .addSignature(newSignature);
-                                        if (success) {
-                                          _currentDrawing.clear();
-                                          isSelectEraser = false;
-                                          setState(() {});
-                                        } else {
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                  'Максимальное количество подписей достигнуто'),
-                                            ),
-                                          );
-                                        }
-                                      }
-                                      setState(() {
-                                        addPenMode = false;
-                                      });
-                                    },
-                                    child: AppIcons.selectBlack22x15,
-                                  ),
-                                ],
-                              )
+                          mainAxisAlignment:
+                          MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Add sign', style: AppTextStyle.exo20),
+                            CustomCircularButton(
+                              withBorder: true,
+                              withShadow: false,
+                              onTap: () {
+                                // При завершении рисования добавляем новую подпись через кубит,
+                                // если их количество меньше 4.
+                                if (_currentDrawing.isNotEmpty) {
+                                  final newSignature = NoteData(
+                                    // Предполагается, что NoteData генерирует уникальный id
+                                    points: List.from(_currentDrawing),
+                                    offset: Offset(100.w, 100.w),
+                                    color: _textColor,
+                                    strokeWidth: _fontSize,
+                                    size: Size(150.w, 100.h),
+                                    baseSize: Size(361.w, 203.h),
+                                  );
+                                  final success = context
+                                      .read<SignaturesCubit>()
+                                      .addSignature(newSignature);
+                                  if (success) {
+                                    _currentDrawing.clear();
+                                    isSelectEraser = false;
+                                    setState(() {});
+                                  } else {
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                            'Максимальное количество подписей достигнуто'),
+                                      ),
+                                    );
+                                  }
+                                }
+                                setState(() {
+                                  addPenMode = false;
+                                });
+                              },
+                              child: AppIcons.selectBlack22x15,
+                            ),
+                          ],
+                        )
                             : Text('Saved sign', style: AppTextStyle.exo20),
                         SizedBox(height: 18.h),
                         // Если режим добавления подписи активен, показываем область для рисования
                         addPenMode
                             ? Container(
-                                key: _drawingKey,
-                                decoration: BoxDecoration(
-                                  borderRadius:
-                                      BorderRadius.all(Radius.circular(12.r)),
-                                  color: AppColors.white,
-                                  border: Border.all(
-                                    width: 2.w,
-                                    color: AppColors.greyIcon,
-                                  ),
+                          key: _drawingKey,
+                          decoration: BoxDecoration(
+                            borderRadius:
+                            BorderRadius.all(Radius.circular(12.r)),
+                            color: AppColors.white,
+                            border: Border.all(
+                              width: 2.w,
+                              color: AppColors.greyIcon,
+                            ),
+                          ),
+                          padding: EdgeInsets.all(8.w),
+                          width: drawingWidth,
+                          height: drawingHeight,
+                          child: ClipRect(
+                            child: GestureDetector(
+                              onPanStart: (details) {
+                                setState(() {
+                                  RenderBox box = _drawingKey
+                                      .currentContext!
+                                      .findRenderObject() as RenderBox;
+                                  Offset localPosition =
+                                  box.globalToLocal(
+                                      details.globalPosition);
+                                  // Обеспечиваем, что точка находится внутри области рисования
+                                  localPosition = Offset(
+                                    localPosition.dx
+                                        .clamp(0.0, drawingWidth),
+                                    localPosition.dy
+                                        .clamp(0.0, drawingHeight),
+                                  );
+                                  _currentDrawing.add(
+                                      DrawPoint(localPosition, isSelectEraser));
+                                });
+                              },
+                              onPanUpdate: (details) {
+                                setState(() {
+                                  RenderBox box = _drawingKey
+                                      .currentContext!
+                                      .findRenderObject() as RenderBox;
+                                  Offset localPosition =
+                                  box.globalToLocal(
+                                      details.globalPosition);
+                                  localPosition = Offset(
+                                    localPosition.dx
+                                        .clamp(0.0, drawingWidth),
+                                    localPosition.dy
+                                        .clamp(0.0, drawingHeight),
+                                  );
+                                  _currentDrawing.add(
+                                      DrawPoint(localPosition, isSelectEraser));
+                                });
+                              },
+                              onPanEnd: (details) {
+                                _currentDrawing.add(null);
+                              },
+                              child: CustomPaint(
+                                painter: HandwritingPainter(
+                                  points: _currentDrawing,
+                                  color: _textColor,
+                                  strokeWidth: _fontSize,
+                                  baseSize:
+                                  Size(drawingWidth, drawingHeight),
                                 ),
-                                padding: EdgeInsets.all(8.w),
-                                width: drawingWidth,
-                                height: drawingHeight,
-                                child: ClipRect(
-                                  child: GestureDetector(
-                                    onPanStart: (details) {
-                                      setState(() {
-                                        RenderBox box = _drawingKey
-                                            .currentContext!
-                                            .findRenderObject() as RenderBox;
-                                        Offset localPosition =
-                                            box.globalToLocal(
-                                                details.globalPosition);
-                                        // Обеспечиваем, что точка находится внутри области рисования
-                                        localPosition = Offset(
-                                          localPosition.dx
-                                              .clamp(0.0, drawingWidth),
-                                          localPosition.dy
-                                              .clamp(0.0, drawingHeight),
-                                        );
-                                        _currentDrawing.add(DrawPoint(
-                                            localPosition, isSelectEraser));
-                                      });
-                                    },
-                                    onPanUpdate: (details) {
-                                      setState(() {
-                                        RenderBox box = _drawingKey
-                                            .currentContext!
-                                            .findRenderObject() as RenderBox;
-                                        Offset localPosition =
-                                            box.globalToLocal(
-                                                details.globalPosition);
-                                        localPosition = Offset(
-                                          localPosition.dx
-                                              .clamp(0.0, drawingWidth),
-                                          localPosition.dy
-                                              .clamp(0.0, drawingHeight),
-                                        );
-                                        _currentDrawing.add(DrawPoint(
-                                            localPosition, isSelectEraser));
-                                      });
-                                    },
-                                    onPanEnd: (details) {
-                                      _currentDrawing.add(null);
-                                    },
-                                    child: CustomPaint(
-                                      painter: HandwritingPainter(
-                                        points: _currentDrawing,
-                                        color: _textColor,
-                                        strokeWidth: _fontSize,
-                                        baseSize:
-                                            Size(drawingWidth, drawingHeight),
-                                      ),
-                                      child: Container(),
-                                    ),
-                                  ),
-                                ),
-                              )
-                            // Если режим добавления выключен, выводим Wrap со всеми сохранёнными подписями
+                                child: Container(),
+                              ),
+                            ),
+                          ),
+                        )
+                        // Если режим добавления выключен, выводим Wrap со всеми сохранёнными подписями
                             : BlocBuilder<SignaturesCubit, List<NoteData>>(
-                                builder: (context, signatures) {
-                                  if (signatures.isEmpty) {
-                                    // Если список пустой, показываем кнопку по центру.
-                                    return Center(
-                                      child: CustomCircularButton(
-                                        withBorder: true,
-                                        withShadow: false,
-                                        onTap: () {
-                                          setState(() {
-                                            addPenMode = true;
-                                          });
-                                        },
-                                        child: AppIcons.plusBlack22x22,
-                                      ),
-                                    );
-                                  } else {
-                                    // Если список не пустой, отображаем Wrap со списком подписей и кнопкой добавления.
-                                    return Wrap(
-                                      alignment: WrapAlignment.start,
-                                      crossAxisAlignment:
-                                          WrapCrossAlignment.center,
-                                      spacing: 16.w,
-                                      runSpacing: 8.w,
-                                      children: [
-                                        ...signatures.map((note) {
-                                          return GestureDetector(
-                                            onTap: () {
-                                              // При нажатии на подпись добавляем её в локальный список для отображения на экране.
-                                              setState(() {
-                                                // Если такая подпись уже добавлена, можно не добавлять повторно.
-                                                if (!_placedSignatures.any(
-                                                    (e) => e.id == note.id)) {
-                                                  _placedSignatures.add(note);
-                                                }
-                                              });
-                                            },
-                                            child: Container(
-                                              decoration: BoxDecoration(
-                                                borderRadius: BorderRadius.all(
-                                                    Radius.circular(12.r)),
-                                                color: AppColors.white,
-                                                border: Border.all(
-                                                  width: 2.w,
-                                                  color: AppColors.greyIcon,
-                                                ),
+                          builder: (context, signatures) {
+                            if (signatures.isEmpty) {
+                              // Если список пустой, показываем кнопку по центру.
+                              return Center(
+                                child: CustomCircularButton(
+                                  withBorder: true,
+                                  withShadow: false,
+                                  onTap: () {
+                                    setState(() {
+                                      addPenMode = true;
+                                    });
+                                  },
+                                  child: AppIcons.plusBlack22x22,
+                                ),
+                              );
+                            } else {
+                              // Если список не пустой, отображаем Wrap со списком подписей и кнопкой добавления.
+                              return Wrap(
+                                alignment: WrapAlignment.start,
+                                crossAxisAlignment:
+                                WrapCrossAlignment.center,
+                                spacing: 16.w,
+                                runSpacing: 8.w,
+                                children: [
+                                  ...signatures.map((note) {
+                                    return GestureDetector(
+                                      onTap: () {
+                                        // При нажатии на подпись добавляем её в локальный список для отображения на экране.
+                                        setState(() {
+                                          // Если такая подпись уже добавлена, можно не добавлять повторно.
+                                          if (!_placedSignatures.any(
+                                                  (e) => e.id == note.id)) {
+                                            _placedSignatures.add(note);
+                                          }
+                                        });
+                                      },
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.all(
+                                              Radius.circular(12.r)),
+                                          color: AppColors.white,
+                                          border: Border.all(
+                                            width: 2.w,
+                                            color: AppColors.greyIcon,
+                                          ),
+                                        ),
+                                        padding: EdgeInsets.all(8.w),
+                                        width: 148.w,
+                                        height: 95.h,
+                                        child: Stack(
+                                          children: [
+                                            CustomPaint(
+                                              painter: HandwritingPainter(
+                                                points: note.points,
+                                                color: note.color,
+                                                strokeWidth:
+                                                note.strokeWidth,
+                                                baseSize: note.baseSize,
                                               ),
-                                              padding: EdgeInsets.all(8.w),
-                                              width: 148.w,
-                                              height: 95.h,
-                                              child: Stack(
-                                                children: [
-                                                  CustomPaint(
-                                                    painter: HandwritingPainter(
-                                                      points: note.points,
-                                                      color: note.color,
-                                                      strokeWidth:
-                                                          note.strokeWidth,
-                                                      baseSize: note.baseSize,
-                                                    ),
-                                                    child: Container(),
-                                                  ),
-                                                  Positioned(
-                                                    top: 0,
-                                                    right: 0,
-                                                    child: GestureDetector(
-                                                      onTap: () {
-                                                        context
-                                                            .read<
-                                                                SignaturesCubit>()
-                                                            .removeSignature(
-                                                                note.id);
-                                                      },
-                                                      child: AppIcons.x22x15,
-                                                    ),
-                                                  ),
-                                                ],
+                                              child: Container(),
+                                            ),
+                                            Positioned(
+                                              top: 0,
+                                              right: 0,
+                                              child: GestureDetector(
+                                                onTap: () {
+                                                  context
+                                                      .read<
+                                                      SignaturesCubit>()
+                                                      .removeSignature(
+                                                      note.id);
+                                                },
+                                                child: AppIcons.x22x15,
                                               ),
                                             ),
-                                          );
-                                        }),
-                                        CustomCircularButton(
-                                          withBorder: true,
-                                          withShadow: false,
-                                          onTap: () {
-                                            setState(() {
-                                              addPenMode = true;
-                                            });
-                                          },
-                                          child: AppIcons.plusBlack22x22,
+                                          ],
                                         ),
-                                      ],
+                                      ),
                                     );
-                                  }
-                                },
-                              ),
+                                  }),
+                                  CustomCircularButton(
+                                    withBorder: true,
+                                    withShadow: false,
+                                    onTap: () {
+                                      setState(() {
+                                        addPenMode = true;
+                                      });
+                                    },
+                                    child: AppIcons.plusBlack22x22,
+                                  ),
+                                ],
+                              );
+                            }
+                          },
+                        ),
                         if (addPenMode)
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -545,38 +520,80 @@ class PenEditWidgetState extends State<PenEditWidget> {
   }
 
   /// Метод для построения области с изображением.
-  /// Параметр [itemHeight] позволяет задать высоту контейнера для изображения.
-  Widget _buildImageArea(String imagePath, double itemHeight, bool withShadow) {
+  /// Если изображение выбрано (isSelected == true), то поверх него располагается слой с аннотациями,
+  /// реализованный через Stack, что обеспечивает корректное позиционирование независимо от прокрутки.
+  Widget _buildImageArea(String imagePath, double itemHeight, bool withShadow,
+      {bool isSelected = false}) {
     final double containerWidth = 361.w;
+
+    Widget imageWidget = ClipRRect(
+      borderRadius: BorderRadius.circular(12.r),
+      child: Image.file(
+        File(imagePath),
+        key: UniqueKey(), // для принудительного обновления
+        fit: BoxFit.contain,
+        color: withShadow ? Colors.black.withAlpha(128) : null,
+        colorBlendMode: withShadow ? BlendMode.darken : null,
+      ),
+    );
+
+    Widget imageWidgetBack = ClipRRect(
+      borderRadius: BorderRadius.circular(12.r),
+      child: Image.file(
+        File(imagePath),
+        fit: BoxFit.contain,
+        color: withShadow ? Colors.black.withAlpha(128) : null,
+        colorBlendMode: withShadow ? BlendMode.darken : null,
+      ),
+    );
+
+    // Если изображение выбрано, оборачиваем его в Stack с наложением аннотаций.
+    if (isSelected) {
+      imageWidget = Stack(
+        children: [
+          Positioned.fill(child: imageWidgetBack),
+          Positioned.fill(child: imageWidget),
+          // Слой аннотаций, занимающий всю область изображения.
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12.r),
+              child: Stack(
+                children: _placedSignatures.map((note) {
+                  return ResizableNote(
+                    note: note,
+                    onUpdate: () {
+                      setState(() {});
+                    },
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     return Align(
       alignment: Alignment.center,
       child: Padding(
         padding: EdgeInsets.only(top: 24.h),
         child: SizedBox(
+          key: isSelected ? _selectedImageKey : null,
           width: containerWidth,
           height: itemHeight,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12.r),
-            child: Image.file(
-              File(imagePath),
-              key: UniqueKey(), // можно обновлять ключ для перерисовки
-              fit: BoxFit.contain,
-              color: withShadow ? Colors.black.withValues(alpha: 0.5) : null,
-              colorBlendMode: withShadow ? BlendMode.darken : null,
-            ),
-          ),
+          child: imageWidget,
         ),
       ),
     );
   }
 
   /// Метод для сохранения аннотированного изображения для текущей страницы.
-  /// Метод для сохранения аннотированного изображения для текущей страницы.
   Future<void> saveAnnotatedImage() async {
     final path = currentPagePath;
     if (path.isEmpty) return;
     final file = File(path);
     if (!await file.exists()) return;
+
     try {
       final fileBytes = await file.readAsBytes();
       final ui.Codec codec = await ui.instantiateImageCodec(fileBytes);
@@ -585,47 +602,43 @@ class PenEditWidgetState extends State<PenEditWidget> {
       final int originalWidth = originalImage.width;
       final int originalHeight = originalImage.height;
 
-      // Задаём размеры контейнера, в котором изображение отображается.
-      final double containerWidth = 361.w;
-      final double containerHeight = 491.h;
-      final Size containerSize = Size(containerWidth, containerHeight);
+      // Если возможно, используем реальные размеры контейнера выбранного изображения
+      Size containerSize = Size(361.w, 491.h); // значения по умолчанию
+      if (_selectedImageKey.currentContext != null) {
+        containerSize =
+            _selectedImageKey.currentContext!.size ?? containerSize;
+      }
 
-      // Вычисляем прямоугольник, в котором реально отрисовывается изображение с BoxFit.contain.
+      // Вычисляем прямоугольник, в котором реально отрисовывается изображение (с учетом BoxFit.contain)
       final Rect imageRect = _getImageRect(containerSize);
 
-      // Вычисляем коэффициенты масштабирования относительно отрисованного изображения.
+      // Вычисляем коэффициенты масштабирования
       final double scaleX = originalWidth / imageRect.width;
       final double scaleY = originalHeight / imageRect.height;
 
       final ui.PictureRecorder recorder = ui.PictureRecorder();
       final Canvas canvas = Canvas(recorder);
 
-      // Рисуем исходное изображение (на всю его область).
+      // Рисуем исходное изображение
       canvas.drawImage(originalImage, Offset.zero, Paint());
 
-      // Устанавливаем clipRect равным размерам исходного изображения.
-      // Таким образом, всё, что выходит за его пределы, будет обрезано.
+      // Устанавливаем clipRect равным размерам исходного изображения
       canvas.clipRect(Rect.fromLTWH(
           0, 0, originalWidth.toDouble(), originalHeight.toDouble()));
 
-      // Получаем подписанные записи (signatures), размещённые поверх изображения.
-      final signatures = _placedSignatures;
-      for (var note in signatures) {
-        // Смещаем позицию подписи: note.offset задаётся относительно контейнера,
-        // поэтому вычитаем imageRect.topLeft, чтобы получить координаты относительно изображения.
+      // Отрисовываем аннотации (подписи)
+      for (var note in _placedSignatures) {
         final Offset adjustedOffset = note.offset - imageRect.topLeft;
         final Offset notePos = Offset(
           adjustedOffset.dx * scaleX,
           adjustedOffset.dy * scaleY,
         );
 
-        // Вычисляем масштаб подписи относительно изображения.
         final double noteScaleX =
             (note.size.width / note.baseSize.width) * scaleX;
         final double noteScaleY =
             (note.size.height / note.baseSize.height) * scaleY;
 
-        // Рисуем линии подписи.
         for (int i = 0; i < note.points.length - 1; i++) {
           final DrawPoint? current = note.points[i];
           final DrawPoint? next = note.points[i + 1];
@@ -658,22 +671,20 @@ class PenEditWidgetState extends State<PenEditWidget> {
 
       final ui.Picture picture = recorder.endRecording();
       final ui.Image finalImage =
-          await picture.toImage(originalWidth, originalHeight);
+      await picture.toImage(originalWidth, originalHeight);
       final ByteData? finalByteData =
-          await finalImage.toByteData(format: ui.ImageByteFormat.png);
+      await finalImage.toByteData(format: ui.ImageByteFormat.png);
       if (finalByteData == null) return;
       final Uint8List finalBytes = finalByteData.buffer.asUint8List();
 
-      // Перезаписываем файл итоговым изображением.
       await file.writeAsBytes(finalBytes);
-      imageCache.clear();
-      imageCache.clearLiveImages();
       final FileImage fileImage = FileImage(file);
       await fileImage.evict();
+
       setState(() {
-        // После сохранения очищаем временные данные и генерируем новый ключ для обновления превью.
         _currentDrawing.clear();
         _placedSignatures.clear();
+        // Обновляем ключ для перерисовки изображения
         imageKey = UniqueKey();
       });
     } catch (e) {
@@ -683,8 +694,7 @@ class PenEditWidgetState extends State<PenEditWidget> {
 
   /// Метод для загрузки размеров изображения (например, из файла)
   Future<void> _loadImageSize() async {
-    final String path = widget
-        .file.pages[_currentPageIndex]; // или другой способ получения пути
+    final String path = widget.file.pages[_currentPageIndex]; // или другой способ получения пути
     if (path.isEmpty) return;
     final fileBytes = await File(path).readAsBytes();
     final decoded = img.decodeImage(fileBytes);
@@ -696,7 +706,7 @@ class PenEditWidgetState extends State<PenEditWidget> {
     }
   }
 
-  // Вычисляет прямоугольник, в котором фактически отрисовывается изображение
+  /// Вычисляет прямоугольник, в котором фактически отрисовывается изображение
   /// внутри контейнера (с учетом BoxFit.contain).
   Rect _getImageRect(Size containerSize) {
     if (_imageWidth == 0 || _imageHeight == 0) {
@@ -741,8 +751,8 @@ class PenEditWidgetState extends State<PenEditWidget> {
           border: isSelected
               ? Border.all(color: AppColors.black, width: 3.w)
               : (showBorder
-                  ? Border.all(color: AppColors.greyIcon, width: 2.w)
-                  : null),
+              ? Border.all(color: AppColors.greyIcon, width: 2.w)
+              : null),
         ),
       ),
     );

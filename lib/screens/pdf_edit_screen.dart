@@ -72,7 +72,7 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
 
   Future<bool> _showSubscriptionDialog() async {
     // Проверяем наличие активной подписки через RevenueCat
-    bool hasSubscription = true;//await RevenueCatService().isUserSubscribed();
+    bool hasSubscription = true; //await RevenueCatService().isUserSubscribed();
 
     if (hasSubscription) {
       // Если подписка активна, разрешаем использовать режим Pen
@@ -167,7 +167,6 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
           Column(
             children: [
               SizedBox(height: 60.h),
-              SizedBox(height: 16.h),
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16.h),
                 child: Row(
@@ -195,7 +194,13 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
                   ],
                 ),
               ),
-              SizedBox(height: 8.h),
+              SizedBox(height: 12.h),
+              Container(
+                width: double.infinity,
+                height: 1.h,
+                color: AppColors.black.withValues(alpha: 0.15),
+              ),
+
               Expanded(
                 child: IndexedStack(
                   index: _selectedIndex,
