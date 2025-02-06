@@ -108,13 +108,13 @@ class _FilesPageState extends State<FilesPage> {
                                 //   },
                                 //   child: Text('DocumentScannerTest'),
                                 // ),
-                                // ElevatedButton(
-                                //   onPressed: () {
-                                //     navigation.navigateTo(
-                                //         context, OnboardingScreen());
-                                //   },
-                                //   child: Text('OnboardingScreen'),
-                                // ),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    navigation.navigateTo(
+                                        context, OnboardingScreen());
+                                  },
+                                  child: Text('OnboardingScreen'),
+                                ),
                                 Assets.images.imagePhotoroom2
                                     .image(width: 261.w, height: 217.h),
                                 SizedBox(height: 8.h),

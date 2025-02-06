@@ -15,6 +15,7 @@ import '../widgets/custom_circular_button.dart';
 import '../widgets/pen_edit_widget.dart';
 import '../widgets/text_edit_widget.dart';
 import '../widgets/toggle_menu.dart';
+import 'onboarding_screen.dart';
 
 class PdfEditScreen extends StatefulWidget {
   final ScanFile file;
@@ -78,7 +79,7 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
       return true;
     } else {
       // Если подписки нет, переходим на экран подписки
-      navigation.navigateTo(context, SubscriptionSelectionScreen());
+      navigation.navigateTo(context, OnboardingScreen(initialPage: 3));
       return false;
     }
   }

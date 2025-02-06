@@ -8,6 +8,7 @@ import 'package:owl_tech_pdf_scaner/screens/subscription_selection_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/navigation_service.dart';
+import 'onboarding_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -34,7 +35,7 @@ class SettingsScreen extends StatelessWidget {
             GestureDetector(
               onTap: () async {
                 final navigation = NavigationService();
-                navigation.navigateTo(context, SubscriptionSelectionScreen());
+                navigation.navigateTo(context, OnboardingScreen(initialPage: 3));
               },
               child: Assets.images.unlock.image(
                 height: 143.h,

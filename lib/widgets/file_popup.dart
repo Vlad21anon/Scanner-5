@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:owl_tech_pdf_scaner/app/app_icons.dart';
 import 'package:owl_tech_pdf_scaner/models/scan_file.dart';
+import 'package:owl_tech_pdf_scaner/screens/onboarding_screen.dart';
 import 'package:owl_tech_pdf_scaner/services/navigation_service.dart';
 
 import '../app/app_shadows.dart';
@@ -28,7 +29,7 @@ class FilePopup extends StatelessWidget {
       return true;
     } else {
       // Если подписки нет, переходим на экран подписки
-      NavigationService().navigateTo(context, SubscriptionSelectionScreen());
+      NavigationService().navigateTo(context, OnboardingScreen(initialPage: 3));
       return false;
     }
   }
