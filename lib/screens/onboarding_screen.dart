@@ -9,6 +9,26 @@ import 'dart:math' as math;
 
 import 'package:owl_tech_pdf_scaner/services/navigation_service.dart';
 
+class SlowPageScrollPhysics extends ScrollPhysics {
+  const SlowPageScrollPhysics({super.parent});
+
+  @override
+  SlowPageScrollPhysics applyTo(ScrollPhysics? ancestor) {
+    return SlowPageScrollPhysics(parent: buildParent(ancestor));
+  }
+
+  @override
+  Simulation? createBallisticSimulation(ScrollMetrics position, double velocity) {
+    // Замедляем скорость по осям x и y
+    final slowedVelocity = velocity * 0.5; // Можете подстроить значение
+    return super.createBallisticSimulation(position, slowedVelocity);
+  }
+
+  @override
+  ScrollPhysics get parent => super.parent ?? const AlwaysScrollableScrollPhysics();
+}
+
+
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -71,21 +91,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   // Если во время обновления скролла обнаружено, что текущая позиция меньше,
                   // чем индекс текущей страницы, возвращаемся на _currentPage.
                   if (notification is ScrollUpdateNotification) {
-                    if (_pageController.page != null && _pageController.page! < _currentPage) {
+                    if (_pageController.page != null &&
+                        _pageController.page! < _currentPage) {
                       _pageController.jumpToPage(_currentPage);
                     }
                   }
                   return false;
                 },
                 child: PageView(
-                controller: _pageController,
-                onPageChanged: (int index) {
-                  setState(() {
-                    _currentPage = index;
-                  });
-                },
-                children: _pages,
-              ),),
+                  physics: const SlowPageScrollPhysics(),
+                  controller: _pageController,
+                  onPageChanged: (int index) {
+                    setState(() {
+                      _currentPage = index;
+                    });
+                  },
+                  children: _pages,
+                ),
+              ),
             ),
           ),
           // Индикатор страницы и кнопка Skip (дизайн сохраняется)

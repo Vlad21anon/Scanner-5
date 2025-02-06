@@ -257,6 +257,7 @@ class PenEditWidgetState extends State<PenEditWidget> {
                                         if (success) {
                                           _currentDrawing.clear();
                                           isSelectEraser = false;
+                                          setState(() {});
                                         } else {
                                           ScaffoldMessenger.of(context)
                                               .showSnackBar(

@@ -167,6 +167,34 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
             children: [
               SizedBox(height: 60.h),
               SizedBox(height: 16.h),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.h),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    CustomCircularButton(
+                      onTap: () {
+                        navigation.pop(context);
+                      },
+                      child: AppIcons.arrowLeftBlack22x18,
+                    ),
+                    Text(
+                      _getTitle(),
+                      style: AppTextStyle.nunito32,
+                    ),
+                    CustomCircularButton(
+                      onTap: () async {
+                        final state = await _showSubscriptionDialog();
+                        if (state == true) {
+                          _sharePdfFile();
+                        }
+                      },
+                      child: AppIcons.share19x22,
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 8.h),
               Expanded(
                 child: IndexedStack(
                   index: _selectedIndex,
@@ -174,38 +202,6 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
                 ),
               ),
             ],
-          ),
-          Positioned(
-            top: 60.h,
-            left: 0.w,
-            right: 0.w,
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.h),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  CustomCircularButton(
-                    onTap: () {
-                      navigation.pop(context);
-                    },
-                    child: AppIcons.arrowLeftBlack22x18,
-                  ),
-                  Text(
-                    _getTitle(),
-                    style: AppTextStyle.nunito32,
-                  ),
-                  CustomCircularButton(
-                    onTap: () async {
-                      final state = await _showSubscriptionDialog();
-                      if (state == true) {
-                        _sharePdfFile();
-                      }
-                    },
-                    child: AppIcons.share19x22,
-                  ),
-                ],
-              ),
-            ),
           ),
           Positioned(
             bottom: 12.h,

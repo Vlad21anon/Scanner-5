@@ -39,7 +39,7 @@ class _ScanScreenState extends State<ScanScreen> {
   void initState() {
     super.initState();
     // Запрашиваем разрешения на камеру и микрофон
-    PermissionService().requestCameraAndMicrophonePermissions();
+
   }
 
   /// Обработка фотографии, снятой камерой

@@ -15,6 +15,7 @@ import 'package:path/path.dart' as path;
 import 'package:visibility_detector/visibility_detector.dart';
 
 import '../screens/loading_screen.dart';
+import '../services/permission_service.dart';
 
 /// Виджет, который реализует сканирование документа с использованием камеры.
 /// После нажатия на кнопку «Сфотографировать» происходит обработка изображения в отдельном изоляте.
@@ -49,7 +50,7 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    _initCamera();
+    PermissionService().requestCameraAndMicrophonePermissions().then((_) => _initCamera());
   }
 
   @override
@@ -61,9 +62,9 @@ class DocumentScannerWidgetState extends State<DocumentScannerWidget>
   double getOffsetAdjustmentY(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
     if (screenHeight >= 800) {
-      return -45;
+      return -85;
     } else {
-      return -15;
+      return -45;
     }
   }
 

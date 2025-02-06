@@ -15,6 +15,7 @@ import '../services/revenuecat_service.dart';
 import '../widgets/custom_circular_button.dart';
 import '../widgets/file_card.dart';
 import '../widgets/filter_popup.dart';
+import 'onboarding_screen.dart';
 
 class FilesPage extends StatefulWidget {
   const FilesPage({super.key});
@@ -107,13 +108,13 @@ class _FilesPageState extends State<FilesPage> {
                                 //   },
                                 //   child: Text('DocumentScannerTest'),
                                 // ),
-                                ElevatedButton(
-                                  onPressed: () {
-                                    navigation.navigateTo(
-                                        context, SubscriptionTestPage());
-                                  },
-                                  child: Text('OnboardingScreen'),
-                                ),
+                                // ElevatedButton(
+                                //   onPressed: () {
+                                //     navigation.navigateTo(
+                                //         context, OnboardingScreen());
+                                //   },
+                                //   child: Text('OnboardingScreen'),
+                                // ),
                                 Assets.images.imagePhotoroom2
                                     .image(width: 261.w, height: 217.h),
                                 SizedBox(height: 8.h),
