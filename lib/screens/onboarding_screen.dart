@@ -113,17 +113,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         ),
       ];
 
+  // Обработчик нажатия кнопки:
   void _onButtonPressed() {
-    // Если не последний экран – переходим на следующий
-    if (_currentPage < _pages.length - 1) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    } else {
-      // Если последний экран – оформляем подписку
-      _purchaseSubscription();
-    }
+    setState(() {
+      if (_currentPage < _pages.length - 1) {
+        _currentPage++; // переходим на следующую страницу
+      } else {
+        _purchaseSubscription(); // если последняя – оформляем подписку
+      }
+    });
   }
 
   /// Метод для открытия URL
@@ -166,15 +164,25 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   }
                   return false;
                 },
-                child: PageView(
-                  physics: const SlowPageScrollPhysics(),
-                  controller: _pageController,
-                  onPageChanged: (int index) {
-                    setState(() {
-                      _currentPage = index;
-                    });
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  transitionBuilder:
+                      (Widget child, Animation<double> animation) {
+                    // Пример с эффектом слайда (новая страница заезжает справа)
+                    return SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(1.0, 0.0),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: child,
+                    );
                   },
-                  children: _pages,
+                  // Чтобы AnimatedSwitcher понимал, что контент меняется,
+                  // каждому виджету страницы присваиваем уникальный ключ:
+                  child: Container(
+                    key: ValueKey<int>(_currentPage),
+                    child: _pages[_currentPage],
+                  ),
                 ),
               ),
             ),
