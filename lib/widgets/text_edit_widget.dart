@@ -331,7 +331,7 @@ class TextEditWidgetState extends State<TextEditWidget> {
               },
             )
                 : _buildImageArea(
-                widget.file.pages.first, _imageHeight.toDouble(), false,
+                widget.file.pages.first, selectedHeight.toDouble(), false,
                 isSelected: true),
             // Индикатор номера страницы (если многостраничный режим)
             if (multiPage)

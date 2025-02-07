@@ -7,11 +7,11 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image/image.dart' as img;
 import 'package:owl_tech_pdf_scaner/app/app_text_style.dart';
 import 'package:owl_tech_pdf_scaner/models/scan_file.dart';
+import 'package:snappy_list_view/snappy_list_view.dart';
 import '../app/app_colors.dart';
+import '../screens/test.dart';
 
-///
 /// Виджет для обрезки изображения (поддержка многостраничного режима).
-///
 class MultiPageCropWidget extends StatefulWidget {
   final ScanFile file; // Передаётся объект с списком страниц
   final int? index;
@@ -29,9 +29,9 @@ class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
   // Контроллер для PageView (вертикальная прокрутка)
   late PageController _pageController;
 
-  // Инициализация контроллера (например, в initState):
+  // Контроллер для колесика (если потребуется)
   FixedExtentScrollController _wheelController =
-      FixedExtentScrollController(initialItem: 0);
+  FixedExtentScrollController(initialItem: 0);
 
   // Размеры изображения (в пикселях) для текущей страницы
   int _imageWidth = 0;
@@ -63,12 +63,14 @@ class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
   Size _containerSize = Size.zero;
   LocalKey imageKey = UniqueKey();
 
+  // GlobalKey для выбранного изображения – используется для привязки слоя аннотаций.
+  final GlobalKey _selectedImageKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: widget.index ?? 0);
     _currentPageIndex = widget.index ?? 0;
-    // Загружаем размеры для первой страницы
     _loadImageSize();
   }
 
@@ -85,7 +87,7 @@ class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
     super.didChangeDependencies();
   }
 
-  /// Загружаем размеры изображения для текущей страницы
+  /// Загружаем размеры изображения для текущей страницы.
   Future<void> _loadImageSize() async {
     try {
       final pagePath = widget.file.pages[_currentPageIndex];
@@ -102,7 +104,7 @@ class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
     }
   }
 
-  /// Сохраняем обрезку для текущей страницы
+  /// Сохраняем обрезку для текущей страницы.
   Future<void> saveCrop() async {
     final pagePath = widget.file.pages[_currentPageIndex];
     if (pagePath.isEmpty) {
@@ -119,7 +121,6 @@ class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
       return;
     }
 
-    // Подготовка параметров для обрезки
     final cropRect = _calculateRealCropRect(
       containerSize: _containerSize,
       imageWidth: _imageWidth,
@@ -142,12 +143,9 @@ class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
     };
 
     try {
-      // Вызываем функцию в изоляте
       final newBytes = await compute(_processImageInIsolate, params);
       await file.writeAsBytes(newBytes);
       debugPrint('Обрезка для страницы $_currentPageIndex сохранена');
-      imageCache.clear();
-      imageCache.clearLiveImages();
       final fileImage = FileImage(File(pagePath));
       await fileImage.evict();
       setState(() {});
@@ -156,7 +154,7 @@ class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
     }
   }
 
-  /// Переводим координаты ручек в реальные координаты исходного изображения
+  /// Переводим координаты ручек в реальные координаты исходного изображения.
   Rect _calculateRealCropRect({
     required Size containerSize,
     required int imageWidth,
@@ -200,7 +198,93 @@ class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
     return Rect.fromLTRB(left, top, right, bottom);
   }
 
-  /// Вычисляем прямоугольник, в котором отрисовывается изображение с BoxFit.contain.
+  void updateImage(LocalKey key) {
+    setState(() {
+      imageKey = key;
+    });
+  }
+
+  /// При переходе на новую страницу: сохраняем обрезку текущей страницы,
+  /// сбрасываем состояния и загружаем размеры нового изображения.
+  Future<void> _onPageChanged(int newPage, double nd) async {
+    await saveCrop();
+    setState(() {
+      _currentPageIndex = newPage;
+      _initializedHandles = false;
+      _imageWidth = 0;
+      _imageHeight = 0;
+    });
+    await _loadImageSize();
+  }
+
+  /// Строим UI для обрезки текущей страницы.
+  Widget _buildCropUI(String imagePath) {
+    return DeferredPointerHandler(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 16.w,
+              right: 16.w,
+              top: 24.h,
+              bottom: 210.h,
+            ),
+            child: LayoutBuilder(
+              builder: (ctx, innerConstraints) {
+                _containerSize = Size(innerConstraints.maxWidth, innerConstraints.maxHeight);
+                if (!_initializedHandles && _imageWidth != 0 && _imageHeight != 0) {
+                  final imageRect = _getImageRect(_containerSize);
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    setState(() {
+                      _topLeft = imageRect.topLeft;
+                      _topRight = imageRect.topRight;
+                      _bottomLeft = imageRect.bottomLeft;
+                      _bottomRight = imageRect.bottomRight;
+                      _initializedHandles = true;
+                    });
+                  });
+                }
+                return SizedBox(
+                  width: innerConstraints.maxWidth,
+                  height: innerConstraints.maxHeight,
+                  child: Stack(
+                    children: [
+                      // Само изображение
+                      Positioned.fill(
+                        child: Image.file(
+                          File(imagePath),
+                          key: imageKey,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                      // Затемнение и рамка
+                      Positioned.fill(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.all(Radius.circular(16)),
+                          child: CustomPaint(
+                            painter: _CropPainter(
+                              topLeft: _topLeft,
+                              topRight: _topRight,
+                              bottomLeft: _bottomLeft,
+                              bottomRight: _bottomRight,
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Ручки
+                      ..._buildAllHandles(),
+                    ],
+                  ),
+                );
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // Вычисляем прямоугольник, в котором отрисовывается изображение с BoxFit.contain.
   Rect _getImageRect(Size containerSize) {
     if (_imageWidth == 0 || _imageHeight == 0) return Rect.zero;
     final containerAspect = containerSize.width / containerSize.height;
@@ -221,94 +305,108 @@ class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
     }
   }
 
-  void updateImage(LocalKey key) {
-    setState(() {
-      imageKey = key;
-    });
-  }
+  /// Метод для построения области с изображением.
+  /// Если изображение выбрано (isSelected == true), поверх него располагается слой с аннотациями.
+  Widget _buildImageArea(String imagePath, double itemHeight, bool withShadow,
+      {bool isSelected = false}) {
+    final double containerWidth = 361.w;
 
-  /// При переходе на новую страницу: сохраняем обрезку текущей страницы,
-  /// сбрасываем состояния и загружаем размеры нового изображения.
-  Future<void> _onPageChanged(int newPage) async {
-    // Сохраняем текущую страницу
-    await saveCrop();
-    setState(() {
-      _currentPageIndex = newPage;
-      _initializedHandles = false;
-      _imageWidth = 0;
-      _imageHeight = 0;
-    });
-    await _loadImageSize();
-  }
+    // Создаём базовое отображение изображения.
+    Widget baseImageWidget = ClipRRect(
+      borderRadius: BorderRadius.circular(12.r),
+      child: Image.file(
+        File(imagePath),
+        key: imageKey,
+        fit: BoxFit.contain,
+        color: withShadow ? Colors.black.withAlpha(128) : null,
+        colorBlendMode: withShadow ? BlendMode.darken : null,
+      ),
+    );
+    Widget baseImageWidgetBack = ClipRRect(
+      borderRadius: BorderRadius.circular(12.r),
+      child: Image.file(
+        File(imagePath),
+        fit: BoxFit.contain,
+        color: withShadow ? Colors.black.withAlpha(128) : null,
+        colorBlendMode: withShadow ? BlendMode.darken : null,
+      ),
+    );
 
-  /// Строим UI для обрезки текущей страницы (общая логика для одной страницы)
-  Widget _buildCropUI(String imagePath) {
-    return DeferredPointerHandler(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          return Padding(
-            padding: EdgeInsets.only(
-              left: 16.w,
-              right: 16.w,
-              top: 24.h,
-              bottom: 210.h,
-            ),
-            child: LayoutBuilder(
-              builder: (ctx, innerConstraints) {
-                _containerSize =
-                    Size(innerConstraints.maxWidth, innerConstraints.maxHeight);
-                if (!_initializedHandles &&
-                    _imageWidth != 0 &&
-                    _imageHeight != 0) {
-                  final imageRect = _getImageRect(_containerSize);
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    setState(() {
-                      _topLeft = imageRect.topLeft;
-                      _topRight = imageRect.topRight;
-                      _bottomLeft = imageRect.bottomLeft;
-                      _bottomRight = imageRect.bottomRight;
-                      _initializedHandles = true;
+    Widget imageWidget;
+    if (isSelected) {
+      imageWidget = DeferredPointerHandler(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16.w,
+                right: 16.w,
+              ),
+              child: LayoutBuilder(
+                builder: (ctx, innerConstraints) {
+                  _containerSize = Size(innerConstraints.maxWidth, innerConstraints.maxHeight);
+                  if (!_initializedHandles && _imageWidth != 0 && _imageHeight != 0) {
+                    final imageRect = _getImageRect(_containerSize);
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      setState(() {
+                        _topLeft = imageRect.topLeft;
+                        _topRight = imageRect.topRight;
+                        _bottomLeft = imageRect.bottomLeft;
+                        _bottomRight = imageRect.bottomRight;
+                        _initializedHandles = true;
+                      });
                     });
-                  });
-                }
-                return Stack(
-                  children: [
-                    // Само изображение
-                    Positioned.fill(
-                      child: Image.file(
-                        File(imagePath),
-                        key: imageKey,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                    // Затемнение и рамка
-                    Positioned.fill(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.all(Radius.circular(16)),
-                        child: CustomPaint(
-                          painter: _CropPainter(
-                            topLeft: _topLeft,
-                            topRight: _topRight,
-                            bottomLeft: _bottomLeft,
-                            bottomRight: _bottomRight,
+                  }
+                  return SizedBox(
+                    width: innerConstraints.maxWidth,
+                    height: innerConstraints.maxHeight,
+                    child: Stack(
+                      children: [
+                        Positioned.fill(child: baseImageWidgetBack),
+                        Positioned.fill(child: baseImageWidget),
+                        // Слой аннотаций
+                        Positioned.fill(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.all(Radius.circular(16)),
+                            child: CustomPaint(
+                              painter: _CropPainter(
+                                topLeft: _topLeft,
+                                topRight: _topRight,
+                                bottomLeft: _bottomLeft,
+                                bottomRight: _bottomRight,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
+                        ..._buildAllHandles(),
+                      ],
                     ),
-                    // Ручки
-                    ..._buildAllHandles(),
-                    // Дополнительные элементы (например, кнопки сохранения) можно добавить здесь
-                  ],
-                );
-              },
-            ),
-          );
-        },
+                  );
+                },
+              ),
+            );
+          },
+        ),
+      );
+    } else {
+      imageWidget = baseImageWidget;
+    }
+
+    return Align(
+      alignment: Alignment.center,
+      child: Padding(
+        padding: EdgeInsets.only(top: 24.h),
+        child: SizedBox(
+          key: isSelected ? _selectedImageKey : null,
+          width: containerWidth,
+          height: itemHeight,
+          child: imageWidget,
+        ),
       ),
     );
   }
 
-  /// Создаём 8 ручек
+  /// Создаём 8 ручек.
   List<Widget> _buildAllHandles() {
     return [
       _buildHandle(_HandlePosition.topLeft),
@@ -432,13 +530,16 @@ class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
         return Offset(
             (_topLeft.dx + _topRight.dx) / 2, (_topLeft.dy + _topRight.dy) / 2);
       case _HandlePosition.bottomCenter:
-        return Offset((_bottomLeft.dx + _bottomRight.dx) / 2,
+        return Offset(
+            (_bottomLeft.dx + _bottomRight.dx) / 2,
             (_bottomLeft.dy + _bottomRight.dy) / 2);
       case _HandlePosition.leftCenter:
-        return Offset((_topLeft.dx + _bottomLeft.dx) / 2,
+        return Offset(
+            (_topLeft.dx + _bottomLeft.dx) / 2,
             (_topLeft.dy + _bottomLeft.dy) / 2);
       case _HandlePosition.rightCenter:
-        return Offset((_topRight.dx + _bottomRight.dx) / 2,
+        return Offset(
+            (_topRight.dx + _bottomRight.dx) / 2,
             (_topRight.dy + _bottomRight.dy) / 2);
     }
   }
@@ -482,10 +583,12 @@ class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
     tr = _clampToArea(tr);
     bl = _clampToArea(bl);
     br = _clampToArea(br);
-    _topLeft = tl;
-    _topRight = tr;
-    _bottomLeft = bl;
-    _bottomRight = br;
+    setState(() {
+      _topLeft = tl;
+      _topRight = tr;
+      _bottomLeft = bl;
+      _bottomRight = br;
+    });
   }
 
   Offset _clampToArea(Offset p) {
@@ -494,59 +597,76 @@ class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
     return Offset(x.toDouble(), y.toDouble());
   }
 
-
   @override
   Widget build(BuildContext context) {
-    final double fullHeight = MediaQuery.of(context).size.height;
-    final double itemHeight =
-        fullHeight * 0.8; // центральный элемент занимает 80% экрана
-    const double gap = 24.0; // общий зазор между элементами
-    final double itemExtent = itemHeight +
-        gap; // расстояние от центра одного элемента до центра следующего
+    final bool multiPage = widget.file.pages.length > 1;
+    final double screenHeight = MediaQuery.of(context).size.height;
+    // Высота для выбранного и невыбранного элементов (по 50% экрана)
+    final double selectedHeight = screenHeight * 0.50;
+    final double nonSelectedHeight = screenHeight * 0.50;
 
-    // Если файл содержит одну страницу, используем обычный режим (без PageView)
-    if (widget.file.pages.length <= 1) {
-      return _buildCropUI(widget.file.pages.first);
-    }
-
-    return Stack(
-      children: [
-        PageView.builder(
-          controller: _pageController,
-          scrollDirection: Axis.vertical,
-          itemCount: widget.file.pages.length,
-          onPageChanged: (newPage) async {
-            await _onPageChanged(newPage);
-          },
-          itemBuilder: (context, index) {
-            return _buildCropUI(widget.file.pages[index]);
-          },
-        ),
-        // Отображение номера текущей страницы внизу
-        Positioned(
-          bottom: 90.h, // отступ от нижнего края (можно регулировать)
-          left: 0,
-          right: 0,
-          child: Center(
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12.r),
-              ),
-              child: Text(
-                "${_currentPageIndex + 1} / ${widget.file.pages.length}",
-                style: AppTextStyle.exo20,
+    return Scaffold(
+      resizeToAvoidBottomInset: false,
+      backgroundColor: AppColors.background,
+      body: SizedBox.expand(
+        child: Stack(
+          children: [
+            // Если файлов несколько, используем SnappyListView, иначе одно изображение.
+            multiPage
+                ? SnappyListView(
+              snapAlignment: SnapAlignment.static(0.1),
+              snapOnItemAlignment: SnapAlignment.static(0.1),
+              controller: _pageController,
+              scrollDirection: Axis.vertical,
+              itemCount: widget.file.pages.length,
+              itemSnapping: true,
+              physics: const CustomPageViewScrollPhysics(),
+              onPageChanged: _onPageChanged,
+              itemBuilder: (context, index) {
+                final double itemHeight = index == _currentPageIndex
+                    ? selectedHeight
+                    : nonSelectedHeight;
+                return Padding(
+                  padding: EdgeInsets.symmetric(vertical: 5),
+                  child: _buildImageArea(
+                    widget.file.pages[index],
+                    itemHeight,
+                    index != _currentPageIndex, // затемнение для невыбранного
+                    isSelected: index == _currentPageIndex,
+                  ),
+                );
+              },
+            )
+                : _buildImageArea(
+                widget.file.pages.first, selectedHeight.toDouble(), false,
+                isSelected: true),
+            // Индикатор текущей страницы
+            Positioned(
+              bottom: 90.h,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12.r),
+                  ),
+                  child: Text(
+                    "${_currentPageIndex + 1} / ${widget.file.pages.length}",
+                    style: AppTextStyle.exo20,
+                  ),
+                ),
               ),
             ),
-          ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
 
-/// Перечисление позиций ручек
+/// Перечисление позиций ручек.
 enum _HandlePosition {
   topLeft,
   topCenter,
@@ -560,7 +680,7 @@ enum _HandlePosition {
 
 enum HandleType { corner, horizontal, vertical }
 
-/// CustomPainter для отрисовки затемнения и рамки
+/// CustomPainter для отрисовки затемнения и рамки.
 class _CropPainter extends CustomPainter {
   final Offset topLeft;
   final Offset topRight;
@@ -610,21 +730,18 @@ class _CropPainter extends CustomPainter {
   }
 }
 
-// Функция, которую будем запускать в изоляте.
-/// Принимает map с параметрами и возвращает результат обработки.
+/// Функция для обработки изображения в изоляте.
 Future<List<int>> _processImageInIsolate(Map<String, dynamic> params) async {
   final String filePath = params['filePath'];
   final Map<String, double> cropRect =
-      params['cropRect']; // left, top, width, height
+  params['cropRect']; // left, top, width, height
 
-  // Читаем файл и декодируем изображение
   final fileBytes = await File(filePath).readAsBytes();
   final original = img.decodeImage(fileBytes);
   if (original == null) {
     throw Exception('Не удалось декодировать изображение');
   }
 
-  // Обрезаем изображение
   final cropped = img.copyCrop(
     original,
     x: cropRect['left']!.toInt(),
@@ -633,6 +750,5 @@ Future<List<int>> _processImageInIsolate(Map<String, dynamic> params) async {
     height: cropRect['height']!.toInt(),
   );
 
-  // Кодируем изображение в PNG
   return img.encodePng(cropped);
 }

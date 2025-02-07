@@ -183,7 +183,7 @@ class PenEditWidgetState extends State<PenEditWidget> {
                 },
               )
                   : _buildImageArea(
-                  widget.file.pages.first, _imageHeight.toDouble(), false,
+                  widget.file.pages.first, selectedHeight.toDouble(), false,
                   isSelected: true),
               // Отображение индекса текущей страницы (если файлов несколько)
               if (multiPage)
