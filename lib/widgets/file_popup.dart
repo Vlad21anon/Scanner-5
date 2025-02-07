@@ -36,7 +36,15 @@ class FilePopup extends StatelessWidget {
   /// Функция для создания PDF-файла из аннотированного изображения и его шаринга
   Future<void> _sharePdfFile() async {
     try {
-      await FileShareService.shareFileAsPdf(file, text: 'Ваш PDF файл');
+      await FileShareService.shareFileAsPdf(file, text: 'Your PDF');
+    } catch (e) {
+      debugPrint("Ошибка при создании или шаринге PDF: $e");
+    }
+  }
+
+  Future<void> _downloadPdfFile() async {
+    try {
+      await FileShareService.saveFileAsPdf(file);
     } catch (e) {
       debugPrint("Ошибка при создании или шаринге PDF: $e");
     }
@@ -45,10 +53,23 @@ class FilePopup extends StatelessWidget {
   /// Функция для создания PDF-файла из аннотированного изображения и его шаринга
   Future<void> _showSubscriptionDialogOrShare(BuildContext context) async {
     try {
-      final state = await _showSubscriptionDialog(context);
+      final state = true; //await _showSubscriptionDialog(context);
 
       if(state) {
         _sharePdfFile();
+      }
+    } catch (e) {
+      debugPrint("Ошибка при создании или шаринге PDF: $e");
+    }
+  }
+
+  /// Функция для создания PDF-файла из аннотированного изображения и его шаринга
+  Future<void> _showSubscriptionDialogOrDownload(BuildContext context) async {
+    try {
+      final state = true; //await _showSubscriptionDialog(context);
+
+      if(state) {
+        _downloadPdfFile();
       }
     } catch (e) {
       debugPrint("Ошибка при создании или шаринге PDF: $e");
@@ -89,7 +110,7 @@ class FilePopup extends StatelessWidget {
               ),
                SizedBox(height: 16.h),
               _buildMenuItem(
-                onTap: () {},
+                onTap: () => _showSubscriptionDialogOrDownload(context),
                 title: 'Download',
                 icon: AppIcons.download16x16,
               ),

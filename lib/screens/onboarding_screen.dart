@@ -63,6 +63,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   // Функция оформления подписки
   Future<void> _purchaseSubscription() async {
+
+    setState(() {
+      _isLoading = true;
+    });
     String packageIdentifier =
         selectedSub == SelectedSubType.year ? "year_package" : "week_package";
 
@@ -76,13 +80,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       debugPrint("Подписка не оформлена");
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text("Подписка не оформлена, попробуйте еще раз.")),
+            content: Text("Purchase error.")),
       );
     }
+
+    setState(() {
+      _isLoading = false;
+    });
   }
 
   /// Метод для восстановления покупок
   Future<void> _restorePurchases() async {
+
+    setState(() {
+      _isLoading = true;
+    });
     await RevenueCatService()
         .restorePurchases(); // Если данный метод добавлен в сервис
     bool subscribed = await RevenueCatService().isUserSubscribed();
@@ -92,9 +104,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     } else {
       debugPrint("Подписка не восстановлена");
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Не удалось восстановить подписку.")),
+        const SnackBar(content: Text("Failed to restore subscription.")),
       );
     }
+
+    setState(() {
+      _isLoading = false;
+    });
   }
 
   // Список страниц онбординга.
@@ -108,6 +124,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           onTapItem: (newType) {
             setState(() {
               selectedSub = newType;
+              _purchaseSubscription();
             });
           },
         ),
@@ -131,6 +148,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       throw Exception('Не удалось открыть $url');
     }
   }
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -218,8 +236,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     GestureDetector(
                       onTap: () {
                         // Пропускаем онбординг
-                        navigator.navigateTo(context, MainScreen(),
-                            replace: true);
+                        setState(() {
+                          _currentPage = 3;
+                        });
                       },
                       child: Text(
                         'Skip',
@@ -352,6 +371,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
             ),
           ),
+
+          if (_isLoading)
+            Container(
+              color: Colors.black.withOpacity(0.5), // затемненный фон
+              child: const Center(
+                child: CircularProgressIndicator(
+                  color: Colors.blue,
+                ),
+              ),
+            ),
         ],
       ),
     );

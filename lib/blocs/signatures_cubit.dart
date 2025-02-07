@@ -13,6 +13,9 @@ class SignaturesCubit extends HydratedCubit<List<NoteData>> {
     emit(newList);
     return true;
   }
+  bool canDrawSign() {
+    return state.length < 4;
+  }
 
   /// Удаляет подпись по идентификатору.
   void removeSignature(String id) {

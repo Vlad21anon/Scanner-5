@@ -90,7 +90,7 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
       _isShareSelected = true;
     });
     try {
-      await FileShareService.shareFileAsPdf(widget.file, text: 'Ваш PDF файл');
+      await FileShareService.shareFileAsPdf(widget.file, text: '');
     } catch (e) {
       debugPrint("Ошибка при создании или шаринге PDF: $e");
     }
@@ -120,12 +120,14 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
       _cropKey.currentState?.updateImage(UniqueKey());
     }
 
+    if (_oldIndex == 1 && newIndex == 1) {
+
+    }
     if (_oldIndex == 2 && newIndex == 2) {
-      await _penKey.currentState?.saveAnnotatedImage();
-      final state = await _showSubscriptionDialog();
-      if (state) {
-        _sharePdfFile();
-      }
+
+    }
+    if (_oldIndex == 3 && newIndex == 3) {
+
     }
 
     // Просто обновляем выбранный индекс, без проверки подписки

@@ -122,7 +122,7 @@ class PenEditWidgetState extends State<PenEditWidget> {
 
   double getMinChildSize(BuildContext context, bool addPenMode) {
     final screenHeight = MediaQuery.of(context).size.height;
-    return screenHeight >= 800 ? (addPenMode ? 0.85 : 0.1) : (addPenMode ? 0.95 : 0.1);
+    return screenHeight >= 800 ? (addPenMode ? 0.85 : 0.2) : (addPenMode ? 0.95 : 0.2);
   }
 
   double getMaxChildSize(BuildContext context, bool addPenMode) {
@@ -246,6 +246,7 @@ class PenEditWidgetState extends State<PenEditWidget> {
                               withBorder: true,
                               withShadow: false,
                               onTap: () {
+
                                 // При завершении рисования добавляем новую подпись через кубит,
                                 // если их количество меньше 4.
                                 if (_currentDrawing.isNotEmpty) {
@@ -270,7 +271,7 @@ class PenEditWidgetState extends State<PenEditWidget> {
                                         .showSnackBar(
                                       SnackBar(
                                         content: Text(
-                                            'Максимальное количество подписей достигнуто'),
+                                            'Maximum number of signatures reached'),
                                       ),
                                     );
                                   }
@@ -438,13 +439,25 @@ class PenEditWidgetState extends State<PenEditWidget> {
                                       ),
                                     );
                                   }),
+
                                   CustomCircularButton(
                                     withBorder: true,
                                     withShadow: false,
                                     onTap: () {
-                                      setState(() {
-                                        addPenMode = true;
-                                      });
+                                      bool canAddNewSign = context.read<SignaturesCubit>().canDrawSign();
+                                      if (canAddNewSign) {
+                                        setState(() {
+                                          addPenMode = true;
+                                        });
+                                      } else {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                                'Maximum number of signatures reached'),
+                                          ),
+                                        );
+                                      }
                                     },
                                     child: AppIcons.plusBlack22x22,
                                   ),
@@ -508,9 +521,20 @@ class PenEditWidgetState extends State<PenEditWidget> {
                   );
                 },
               ),
+
+              if (_isLoading)
+                Container(
+                  color: Colors.black.withOpacity(0.5), // затемненный фон
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      color: Colors.blue,
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
+
       ),
     );
   }
@@ -584,12 +608,16 @@ class PenEditWidgetState extends State<PenEditWidget> {
   }
 
   /// Метод для сохранения аннотированного изображения для текущей страницы.
+  bool _isLoading = false;
   Future<void> saveAnnotatedImage() async {
     final path = currentPagePath;
     if (path.isEmpty) return;
     final file = File(path);
     if (!await file.exists()) return;
 
+    setState(() {
+      _isLoading = true;
+    });
     try {
       final fileBytes = await file.readAsBytes();
       final ui.Codec codec = await ui.instantiateImageCodec(fileBytes);
@@ -685,6 +713,11 @@ class PenEditWidgetState extends State<PenEditWidget> {
       });
     } catch (e) {
       debugPrint('Ошибка при сохранении аннотированного изображения: $e');
+    } finally {
+      // Скрыть индикатор загрузки после завершения операции
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 

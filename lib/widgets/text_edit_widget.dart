@@ -179,12 +179,16 @@ class TextEditWidgetState extends State<TextEditWidget> {
   }
 
   /// Сохраняем текст, наложенный на изображение, посредством скриншота текстового блока
+  bool _isLoading = false;
   Future<void> saveTextInImage() async {
     final String path = widget.file.pages[_currentPageIndex];
     if (path.isEmpty || _text.isEmpty) return;
     final file = File(path);
     if (!await file.exists()) return;
 
+    setState(() {
+      _isLoading = true;
+    });
     try {
       // Загружаем исходное изображение
       final fileBytes = await file.readAsBytes();
@@ -262,6 +266,7 @@ class TextEditWidgetState extends State<TextEditWidget> {
       imageCache.clearLiveImages();
 
       setState(() {
+        _isLoading = false;
         _text = '';
         _textOffset = Offset(100.w, 100.h);
         isEditMode = false;
@@ -269,6 +274,9 @@ class TextEditWidgetState extends State<TextEditWidget> {
       });
     } catch (e) {
       debugPrint('Ошибка при сохранении изображения с текстом: $e');
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -438,6 +446,15 @@ class TextEditWidgetState extends State<TextEditWidget> {
               },
             ),
 
+            if (_isLoading)
+              Container(
+                color: Colors.black.withOpacity(0.5), // затемненный фон
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    color: Colors.blue,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -449,7 +466,7 @@ class TextEditWidgetState extends State<TextEditWidget> {
     return screenHeight >= 800 ? (editMode ? 0.8 : 0.45) : (editMode ? 0.82 : 0.5);
   }
 
-  double getMinChildSize(BuildContext context, bool editMode) => 0.1;
+  double getMinChildSize(BuildContext context, bool editMode) => 0.2;
 
   double getMaxChildSize(BuildContext context, bool editMode) {
     final screenHeight = MediaQuery.of(context).size.height;

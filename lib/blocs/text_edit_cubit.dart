@@ -35,7 +35,7 @@ class TextEditCubit extends Cubit<TextEditState> {
     fontSize: 16.0,
     color: Colors.black,
     textOffset: Offset(100, 100),
-    text: 'Ваш текст',
+    text: 'Your text',
   ));
 
   void changeFontSize(double newSize) {

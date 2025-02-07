@@ -104,6 +104,7 @@ class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
     }
   }
 
+  bool _isLoading = false;
   /// Сохраняем обрезку для текущей страницы.
   Future<void> saveCrop() async {
     final pagePath = widget.file.pages[_currentPageIndex];
@@ -120,7 +121,9 @@ class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
       debugPrint('Файл не найден: $pagePath');
       return;
     }
-
+    setState(() {
+      _isLoading = true;
+    });
     final cropRect = _calculateRealCropRect(
       containerSize: _containerSize,
       imageWidth: _imageWidth,
@@ -151,6 +154,11 @@ class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
       setState(() {});
     } catch (e) {
       debugPrint('Ошибка обрезки: $e');
+    } finally {
+      // Скрыть индикатор загрузки после завершения операции
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -659,6 +667,15 @@ class MultiPageCropWidgetState extends State<MultiPageCropWidget> {
                 ),
               ),
             ),
+            if (_isLoading)
+              Container(
+                color: Colors.black.withOpacity(0.5), // затемненный фон
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    color: Colors.blue,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
